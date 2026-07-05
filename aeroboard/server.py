@@ -23,12 +23,16 @@ WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
 def _flight_dict(ac) -> dict:
     return {
+        "hex": ac.hex,
         "label": ac.label,
+        "reg": ac.reg,
         "type": ac.type,
         "alt_ft": None if ac.alt_ft is None else round(ac.alt_ft),
         "on_ground": ac.on_ground,
         "gs_kt": None if ac.gs_kt is None else round(ac.gs_kt),
+        "track": None if ac.track is None else round(ac.track),
         "vrate_fpm": None if ac.vrate_fpm is None else round(ac.vrate_fpm),
+        "squawk": ac.squawk,
         "distance_nm": round(ac.distance_nm, 1),
         "bearing": round(ac.bearing, 1),
         "compass": compass(ac.bearing) if ac.distance_nm else "",
