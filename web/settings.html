@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AeroBoard · Settings</title>
+<style>
+  :root{
+    --bg:#080a10; --panel:#0e141e; --panel2:#0b0f17; --line:#202c40;
+    --ink:#e8ecf4; --dim:#7a8aa4; --faint:#4a566c;
+    --amber:#ffb24d; --green:#4dff9e; --blue:#5aa9ff; --red:#ff5b5b;
+    --mono: ui-monospace, Menlo, Monaco, Consolas, "Courier New", monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);}
+  body{min-height:100vh;padding:20px 16px 60px;-webkit-font-smoothing:antialiased;font-size:14px;}
+  .wrap{max-width:600px;margin:0 auto;}
+  a.back{color:var(--amber);text-decoration:none;font-weight:700;font-size:13px;}
+  h1{font-size:20px;letter-spacing:.14em;margin:12px 0 2px;}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 20px;}
+  fieldset{border:1px solid var(--line);border-radius:8px;margin:0 0 18px;padding:8px 16px 18px;background:var(--panel);}
+  legend{color:var(--green);font-size:11px;letter-spacing:.2em;text-transform:uppercase;padding:0 6px;}
+  label.f{display:block;color:var(--dim);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin:14px 0 5px;}
+  input[type=text],input[type=number]{
+    width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:15px;padding:11px 12px;border-radius:6px;
+  }
+  input:focus{outline:2px solid var(--blue);outline-offset:1px;}
+  .row{display:flex;gap:12px;} .row > div{flex:1;}
+  .searchbar{display:flex;gap:8px;margin-top:5px;}
+  .searchbar input{flex:1;}
+  button{
+    font-family:var(--mono);font-size:14px;font-weight:700;letter-spacing:.06em;cursor:pointer;
+    background:#16233a;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:11px 16px;
+  }
+  button:hover{background:#1d3050;} button:focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
+  button.ghost{background:transparent;color:var(--dim);}
+  button.save{width:100%;padding:15px;font-size:15px;margin-top:6px;color:#fff;
+    background:linear-gradient(180deg,#22406b,#183255);border-color:#2b4a78;}
+  .results{margin-top:8px;display:flex;flex-direction:column;gap:4px;}
+  .results button{text-align:left;font-weight:400;font-size:12px;color:var(--dim);padding:9px 11px;white-space:normal;}
+  .results button:hover{color:var(--ink);}
+  .hint{color:var(--faint);font-size:11px;margin-top:8px;line-height:1.5;}
+  .readout{color:var(--green);font-weight:700;}
+  input[type=range]{width:100%;accent-color:var(--blue);height:26px;}
+  .status{margin-top:12px;font-size:13px;min-height:18px;}
+  .status.ok{color:var(--green);} .status.err{color:var(--red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/">‹ BACK TO BOARD</a>
+  <h1>SETTINGS</h1>
+  <p class="sub">AeroBoard · GEG — Spokane International</p>
+
+  <fieldset>
+    <legend>Location</legend>
+    <label class="f">Find by address or place</label>
+    <div class="searchbar">
+      <input type="text" id="q" placeholder="e.g. 123 Main St, Spokane WA" autocomplete="off">
+      <button type="button" id="searchBtn">Search</button>
+    </div>
+    <div class="results" id="results"></div>
+    <button type="button" class="ghost" id="geoBtn" style="margin-top:10px;">📍 Use my device location</button>
+
+    <div class="row" style="margin-top:6px;">
+      <div><label class="f">Latitude</label><input type="number" id="lat" step="0.0001" inputmode="decimal"></div>
+      <div><label class="f">Longitude</label><input type="number" id="lon" step="0.0001" inputmode="decimal"></div>
+    </div>
+    <label class="f">Location label</label>
+    <input type="text" id="label" maxlength="48" placeholder="Home">
+    <p class="hint">Distances and the “look” direction are measured from here. Enter an
+      address to auto-fill the coordinates, or drop them in by hand.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Traffic</legend>
+    <label class="f">Search radius — <span class="readout" id="radiusOut">40</span> nm</label>
+    <input type="range" id="radius" min="5" max="150" step="5" value="40">
+    <label class="f">“Visible” altitude ceiling — <span class="readout" id="visOut">10,000</span> ft</label>
+    <input type="range" id="vis" min="1000" max="20000" step="500" value="10000">
+    <p class="hint">Planes at or below the ceiling are treated as spottable and sorted to
+      the top of the board.</p>
+  </fieldset>
+
+  <button type="button" class="save" id="saveBtn">SAVE</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+
+  function fmt(){ $('radiusOut').textContent = $('radius').value;
+                 $('visOut').textContent = (+$('vis').value).toLocaleString(); }
+  $('radius').addEventListener('input', fmt);
+  $('vis').addEventListener('input', fmt);
+
+  // load current settings
+  fetch('/api/settings').then(r=>r.json()).then(s=>{
+    $('lat').value = s.home_lat; $('lon').value = s.home_lon;
+    $('label').value = s.location_label || '';
+    $('radius').value = s.radius_nm; $('vis').value = s.visible_alt_ft; fmt();
+  }).catch(()=>{});
+
+  // address search
+  async function search(){
+    const q = $('q').value.trim(); if(!q) return;
+    const box = $('results'); box.innerHTML = '<button class="ghost" disabled>searching…</button>';
+    try{
+      const r = await fetch('/api/geocode?q=' + encodeURIComponent(q));
+      const {results} = await r.json();
+      box.innerHTML = '';
+      if(!results || !results.length){ box.innerHTML = '<button class="ghost" disabled>no matches</button>'; return; }
+      for(const res of results){
+        const b = document.createElement('button');
+        b.textContent = res.label;
+        b.onclick = () => {
+          $('lat').value = res.lat.toFixed(4);
+          $('lon').value = res.lon.toFixed(4);
+          if(!$('label').value) $('label').value = res.label.split(',')[0];
+          box.innerHTML = '';
+        };
+        box.appendChild(b);
+      }
+    }catch(e){ box.innerHTML = '<button class="ghost" disabled>lookup failed</button>'; }
+  }
+  $('searchBtn').onclick = search;
+  $('q').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); search(); } });
+
+  // device geolocation
+  $('geoBtn').onclick = () => {
+    if(!navigator.geolocation){ setStatus('Geolocation not available here', true); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => { $('lat').value = p.coords.latitude.toFixed(4); $('lon').value = p.coords.longitude.toFixed(4); },
+      () => setStatus('Could not get device location', true)
+    );
+  };
+
+  function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.className='status '+(err?'err':'ok'); }
+
+  // save
+  $('saveBtn').onclick = async () => {
+    const lat = num($('lat').value), lon = num($('lon').value);
+    if(lat===null || lon===null){ setStatus('Enter a valid latitude and longitude', true); return; }
+    const body = {
+      home_lat: lat, home_lon: lon,
+      location_label: $('label').value.trim() || 'Home',
+      radius_nm: parseInt($('radius').value, 10),
+      visible_alt_ft: parseInt($('vis').value, 10),
+    };
+    try{
+      const r = await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      if(!r.ok) throw new Error((await r.json()).error || r.status);
+      setStatus('Saved ✓  — the board will update on its next refresh.', false);
+    }catch(e){ setStatus('Save failed: ' + e.message, true); }
+  };
+})();
+</script>
+</body>
+</html>

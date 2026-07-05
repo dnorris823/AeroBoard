@@ -32,23 +32,30 @@ curl localhost:8000/api/flights    # the JSON the UI consumes
 ```
 airplanes.live ─▶ aeroboard/data.py ─▶ aeroboard/server.py ─▶ web/index.html
  (free ADS-B)     fetch + classify      /api/flights (JSON)     canvas pixel UI
-                  + geo-tag             + serves the page        (browser)
+adsbdb.com  ─────▶ + geo-tag + route     + /api/settings         (board · detail
+ (callsign→route)  enrichment            + /api/geocode           · radar · settings)
 ```
 
 - **`data.py`** — fetches aircraft near GEG, computes distance/bearing from home, tags
   each as APPROACH / DEPARTURE / GA / OVERFLIGHT / GROUND, sorts the visible ones first.
-- **`server.py`** — zero-dependency HTTP server: serves the UI + `/api/flights`.
-- **`web/index.html`** — draws a 384×216 pixel canvas, upscaled crisp to the screen.
+- **`routes.py`** — adds origin → destination per airline callsign (adsbdb.com), cached.
+- **`settings.py`** — user location/radius/threshold, persisted to `settings.json`.
+- **`server.py`** — zero-dependency HTTP server: serves the UI + `/api/flights`,
+  `/api/settings` (GET/POST), and `/api/geocode` (address → coordinates).
+- **`web/index.html`** — the board, flight-detail, and radar views (384×216 canvas).
+- **`web/settings.html`** — the settings form.
 
-## Configure
+## Settings
 
-Edit `aeroboard/config.py`:
+Tap the **⚙ gear** on the board (or open **`/settings`**) to set:
 
-- `HOME_LAT` / `HOME_LON` — **currently set to the airport**; drop in your home
-  coordinates so distance/bearing are from your deck.
-- `RADIUS_NM` — how far out to look (default 40).
-- `VISIBLE_ALT_FT`, `CLIMB_FPM`, `DESCENT_FPM` — the "can I see it / is it landing"
-  thresholds.
+- **Location** — type an address (geocoded via OpenStreetMap), use your device's
+  location, or enter latitude/longitude by hand. This is where distances and the
+  "look" direction are measured from.
+- **Search radius** and the **"visible" altitude ceiling**.
+
+Saved to `settings.json` (gitignored); the board picks it up on its next refresh.
+Defaults live in `aeroboard/config.py`.
 
 ## Porting to the OLED (later, on the Raspberry Pi)
 

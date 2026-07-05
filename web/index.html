@@ -38,13 +38,14 @@
   // ---- offline sample (used only if the local server isn't reachable) ----
   const SAMPLE = {
     airport:'GEG', radius_nm:40, source:'sample', error:null, tracking:5,
+    location_label:'GEG (airport)',
     counts:{APPROACH:2,DEPARTURE:1,GA:1,OVERFLIGHT:1},
     flights:[
-      {hex:'a1b2c3',label:'SKW5612',reg:'N612SY',type:'E75L',alt_ft:2900,on_ground:false,gs_kt:139,track:210,vrate_fpm:-640,squawk:'4571',distance_nm:2.9,bearing:41,compass:'NE',tag:'APPROACH',visible:true},
-      {hex:'a2c4e6',label:'DAL1853',reg:'N301DN',type:'A320',alt_ft:5400,on_ground:false,gs_kt:216,track:225,vrate_fpm:-900,squawk:'3422',distance_nm:11.1,bearing:47,compass:'NE',tag:'APPROACH',visible:true},
-      {hex:'b3d5f7',label:'N7908L',reg:'N7908L',type:'BE23',alt_ft:3275,on_ground:false,gs_kt:96,track:90,vrate_fpm:520,squawk:'1200',distance_nm:0.9,bearing:135,compass:'SE',tag:'DEPARTURE',visible:true},
-      {hex:'c4e6a8',label:'N738BS',reg:'N738BS',type:'C172',alt_ft:3300,on_ground:false,gs_kt:103,track:20,vrate_fpm:0,squawk:'1200',distance_nm:6.2,bearing:20,compass:'NNE',tag:'GA',visible:true},
-      {hex:'d5f7b9',label:'ACA109',reg:'C-GHQY',type:'A321',alt_ft:34000,on_ground:false,gs_kt:358,track:300,vrate_fpm:0,squawk:'2701',distance_nm:22,bearing:300,compass:'NW',tag:'OVERFLIGHT',visible:false},
+      {hex:'a1b2c3',label:'SKW5612',reg:'N612SY',type:'E75L',alt_ft:2900,on_ground:false,gs_kt:139,track:210,vrate_fpm:-640,squawk:'4571',origin:'SEA',dest:'GEG',origin_city:'Seattle',dest_city:'Spokane',distance_nm:2.9,bearing:41,compass:'NE',tag:'APPROACH',visible:true},
+      {hex:'a2c4e6',label:'DAL1853',reg:'N301DN',type:'A320',alt_ft:5400,on_ground:false,gs_kt:216,track:225,vrate_fpm:-900,squawk:'3422',origin:'SLC',dest:'GEG',origin_city:'Salt Lake City',dest_city:'Spokane',distance_nm:11.1,bearing:47,compass:'NE',tag:'APPROACH',visible:true},
+      {hex:'b3d5f7',label:'N7908L',reg:'N7908L',type:'BE23',alt_ft:3275,on_ground:false,gs_kt:96,track:90,vrate_fpm:520,squawk:'1200',origin:null,dest:null,distance_nm:0.9,bearing:135,compass:'SE',tag:'DEPARTURE',visible:true},
+      {hex:'c4e6a8',label:'N738BS',reg:'N738BS',type:'C172',alt_ft:3300,on_ground:false,gs_kt:103,track:20,vrate_fpm:0,squawk:'1200',origin:null,dest:null,distance_nm:6.2,bearing:20,compass:'NNE',tag:'GA',visible:true},
+      {hex:'d5f7b9',label:'ACA109',reg:'C-GHQY',type:'A321',alt_ft:34000,on_ground:false,gs_kt:358,track:300,vrate_fpm:0,squawk:'2701',origin:'YVR',dest:'SFO',origin_city:'Vancouver',dest_city:'San Francisco',distance_nm:22,bearing:300,compass:'NW',tag:'OVERFLIGHT',visible:false},
     ],
   };
 
@@ -130,7 +131,9 @@
     text('GEG',4,3,C.amber,12,{bold:true});
     text('SPOKANE INTL',30,4,C.dim,10);
     text(clock().hhmm, W/2, 3, C.ink, 12, {bold:true, center:true});
-    text(`TRACKING ${d.tracking}`, W-4, 4, C.dim, 10, {right:true});
+    text(`TRACKING ${d.tracking}`, W-20, 4, C.dim, 10, {right:true});
+    text('⚙', W-9, 3, C.dim, 12, {center:true});
+    addHit(W-18, 0, 18, 16, () => { location.href = '/settings'; });
 
     const top=18, rowH=25, listX=3, listW=248;
     const maxRows = Math.floor((H-top-14)/rowH);
@@ -142,6 +145,7 @@
       rect(listX,y,2,rowH-2,col);
       text(ac.label, listX+7, y+1, C.ink, 12, {bold:true});
       text(ac.type||'----', listX+74, y+2, C.dim, 11);
+      if (ac.origin && ac.dest) text(`${ac.origin}→${ac.dest}`, listX+116, y+2, C.blue, 10);
       text(ac.tag, listX+listW-4, y+2, col, 9, {right:true});
       const ly = y+14;
       if (ac.alt_ft !== null) {
@@ -198,13 +202,21 @@
     const col = TAG[ac.tag]||C.dim;
     text(ac.tag, W-4, 4, col, 10, {right:true, bold:true});
 
-    // headline
-    text(ac.label, 12, 24, C.ink, 24, {bold:true});
-    text(`${ac.type||'—'}  ·  ${ac.reg||'—'}`, 12, 52, C.dim, 11);
-    rect(12, 68, W-24, 1, C.line);
+    // headline + route
+    text(ac.label, 12, 22, C.ink, 22, {bold:true});
+    const routeStr = (ac.origin && ac.dest) ? `${ac.origin} → ${ac.dest}` : null;
+    if (routeStr) {
+      text(routeStr, 12, 46, C.blue, 15, {bold:true});
+      const cities = [ac.origin_city, ac.dest_city].filter(Boolean).join(' → ');
+      text(`${ac.type||'—'} · ${ac.reg||'—'}${cities ? '   ·   '+cities : ''}`, 12, 64, C.dim, 9);
+    } else {
+      text(`${ac.type||'—'}  ·  ${ac.reg||'—'}`, 12, 48, C.dim, 11);
+      text('scheduled route unavailable', 12, 64, C.faint, 9);
+    }
+    rect(12, 76, W-24, 1, C.line);
 
     // left stats
-    const lx=14; let ly=80;
+    const lx=14; let ly=82;
     const alt = ac.on_ground ? 'ON GROUND' : (ac.alt_ft!=null?`${ac.alt_ft.toLocaleString()} FT`:'—');
     fieldRow(lx, ly, 'ALTITUDE', alt, C.green);
     if (ac.vrate_fpm && Math.abs(ac.vrate_fpm)>=100) {
@@ -212,10 +224,10 @@
       vtri(lx+96, ly+13, up?C.green:C.amber, up);
       text(`${Math.abs(ac.vrate_fpm)} fpm`, lx+106, ly+11, C.dim, 9);
     }
-    ly+=32; fieldRow(lx, ly, 'GROUND SPEED', ac.gs_kt!=null?`${ac.gs_kt} KT`:'—');
-    ly+=32; fieldRow(lx, ly, 'HEADING', ac.track!=null?`${ac.track}°`:'—');
+    ly+=30; fieldRow(lx, ly, 'GROUND SPEED', ac.gs_kt!=null?`${ac.gs_kt} KT`:'—');
+    ly+=30; fieldRow(lx, ly, 'HEADING', ac.track!=null?`${ac.track}°`:'—');
     if (ac.track!=null) bearingTri(lx+70, ly+16, ac.track, 5, C.ink);
-    ly+=32; fieldRow(lx, ly, 'SQUAWK', ac.squawk||'—');
+    ly+=30; fieldRow(lx, ly, 'SQUAWK', ac.squawk||'—');
 
     // right: LOOK panel
     const px=236, pw=W-px-8;
@@ -247,8 +259,9 @@
     backButton();
     text(`RADAR · ${d.radius_nm} NM`, W/2, 4, C.green, 11, {bold:true, center:true});
     text(`TRACKING ${d.tracking}`, W-4, 4, C.dim, 10, {right:true});
+    if (d.location_label) text('◎ ' + d.location_label.slice(0,22), 132, 19, C.dim, 8, {center:true});
 
-    drawRadarWidget(d, 132, 118, 88, {big:true});
+    drawRadarWidget(d, 132, 122, 84, {big:true});
 
     // stats panel
     const sx=252, pw=W-sx-6; let sy=26;

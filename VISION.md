@@ -57,14 +57,23 @@ and season. Glance over, and the sky over our home comes to life.
 - **Data layer (`data.py`):** live aircraft near GEG from a free ADS-B API
   (airplanes.live → adsb.lol fallback), normalized, geo-tagged (distance/bearing from
   home), classified APPROACH / DEPARTURE / GA / OVERFLIGHT. Standard library only.
-- **Render (`web/index.html`):** 384×216 internal canvas, nearest-neighbor upscale;
-  flight strips + radar + in-range summary. Basic + functional now; theming comes next.
+- **Routes + Settings:** `routes.py` adds origin→dest per airline callsign (adsbdb,
+  cached); `settings.py` persists user location/radius/ceiling to `settings.json`.
+- **UI (`web/`):** four tap-navigated views — **board**, **flight detail** (with a
+  "look" compass pointing where to spot it), **fullscreen radar + stats**, and a
+  **settings form** (address lookup / device location / manual coords). Touch handled
+  via pointer events (a mouse click in dev == a finger tap on the panel). Basic +
+  functional now; theming comes next.
 - **Run:** `python3 -m aeroboard.server` → http://localhost:8000
 
-## Data Sources
-- **Primary:** **FlightRadar24** — free, gives route + aircraft type + altitude, no antenna.
-- **Options/upgrades:** FlightAware AeroAPI (paid, very rich), OpenSky, airplanes.live.
-- Local ADS-B **not** used for v1 (no good antenna spot), but supported later.
+## Data Sources (BUILT)
+- **Traffic:** **airplanes.live** (primary) → **adsb.lol** (fallback) — free ADS-B
+  aggregators, no key. Point+radius query around GEG → callsign, type, altitude,
+  speed, position, vertical rate.
+- **Routes:** **adsbdb.com** — callsign → origin/destination (IATA + city), cached hard.
+- **Geocoding:** **OpenStreetMap Nominatim** — Settings address lookup → lat/lon.
+- **Upgrades (later):** FlightAware AeroAPI (richer/route reliability); a local ADS-B
+  receiver (data layer already supports it) if an antenna spot ever appears.
 
 ### Reference projects (for the data layer / prior art — aesthetic is our own)
 - ColinWaddell FlightTracker (Pi/Python flight-data code worth borrowing): https://github.com/ColinWaddell/FlightTracker
@@ -113,8 +122,10 @@ and season. Glance over, and the sky over our home comes to life.
 - **Weather line:** current GEG conditions (OpenWeatherMap) — good plane-watching night?
 
 ### Interaction / viral
-- **Touch to inspect:** tap a plane/scene → a detail card (route map, aircraft photo,
-  distance, how far it's traveled).
+- **Touch to inspect:** ✅ BUILT — tap a flight → detail view (route, altitude/speed,
+  heading, squawk, "look" compass); tap the radar → fullscreen radar + stats.
+- **Settings page:** ✅ BUILT — location (address lookup / device / manual coords),
+  search radius, visibility ceiling.
 - **Daily counter:** "planes spotted today: 42"; monthly "wrapped" summary from a log.
 
 ### Nice-to-have (later)
@@ -129,8 +140,9 @@ and season. Glance over, and the sky over our home comes to life.
 
 ## Open Questions
 - **Birthday date — STILL NEED IT.** Sets our whole build runway. ⟵ most important open item
-- Art-direction sub-vibe: golden-age deco vs. modern ATC radar-room vs. cozy night terminal (or a blend).
-- Personal details to weave in: her name, meaningful flight routes, home lat/long,
+- Art-direction sub-vibe: **chosen → cozy night airport** (theming pass still to come).
+- Home coordinates: now settable in the **Settings page**; using GEG until real ones entered.
+- Personal details to weave in: her name, meaningful flight routes,
   favorite airlines/planes, and whether she (or you) is into aviation.
 
 ## Decisions Log
@@ -140,10 +152,13 @@ and season. Glance over, and the sky over our home comes to life.
 - **Screen:** 5.5" AMOLED, 1080×1920, mounted landscape. Touch = yes.
 - **Art pipeline:** free/CC0 pixel asset packs + procedural rendering + custom personal bits.
 - **Build vs buy:** BUILD ourselves (part of the gift).
-- **Data:** internet flight API (FR24 primary) + METAR for weather; no local receiver v1.
+- **Art sub-vibe:** cozy night airport (warm terminal glow, split-flap, apron floods).
 - **Stack:** Raspberry Pi 4 + 5.5" AMOLED; **web UI (HTML canvas) + zero-dep Python
   server**; ports to the OLED via **Chromium kiosk** on the Pi (dev == device).
-- **Data:** free ADS-B API (airplanes.live, adsb.lol fallback) — proven live, no key.
+- **Data:** free ADS-B API (airplanes.live → adsb.lol); routes via **adsbdb**; geocode
+  via **Nominatim**. No local receiver v1. METAR/weather still to come.
+- **Built:** board + flight-detail + fullscreen-radar-with-stats + settings views;
+  route enrichment; runtime settings (location/radius/ceiling) → settings.json.
 - **~Superseded:** FlightWall / LED-matrix + Adafruit bonnet (pivoted to screen);
   Stardew wood-cottage skin (pivoted to airport/ATC look); Pygame renderer (swapped
   for a browser canvas so laptop-dev and the device run the exact same UI).

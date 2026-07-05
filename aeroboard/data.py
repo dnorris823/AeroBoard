@@ -15,7 +15,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Optional
 
-from . import config
+from . import config, routes, settings
 
 
 # --------------------------------------------------------------------------- #
@@ -69,15 +69,15 @@ class Aircraft:
     distance_nm: float = 0.0
     bearing: float = 0.0
     tag: str = "TRANSIT"
+    visible: bool = False
+    origin: Optional[str] = None
+    dest: Optional[str] = None
+    origin_city: Optional[str] = None
+    dest_city: Optional[str] = None
 
     @property
     def label(self) -> str:
         return (self.callsign or self.reg or self.hex or "??").strip()
-
-    @property
-    def visible(self) -> bool:
-        """Roughly: low enough to actually spot from the ground."""
-        return self.alt_ft is not None and self.alt_ft <= config.VISIBLE_ALT_FT
 
 
 def _num(v):
@@ -87,15 +87,17 @@ def _num(v):
         return None
 
 
-def classify(ac: Aircraft) -> str:
+def classify(ac: Aircraft, visible_alt=None, overflight_alt=None) -> str:
+    visible_alt = config.VISIBLE_ALT_FT if visible_alt is None else visible_alt
+    overflight_alt = config.OVERFLIGHT_ALT_FT if overflight_alt is None else overflight_alt
     if ac.on_ground:
         return "GROUND"
     alt = ac.alt_ft
     if alt is None:
         return "TRANSIT"
-    if alt >= config.OVERFLIGHT_ALT_FT:
+    if alt >= overflight_alt:
         return "OVERFLIGHT"
-    if alt <= config.VISIBLE_ALT_FT:
+    if alt <= visible_alt:
         vr = ac.vrate_fpm or 0
         if vr <= config.DESCENT_FPM:
             return "APPROACH"
@@ -166,9 +168,11 @@ def get_snapshot(
     home_lat=None, home_lon=None, radius=None
 ) -> Snapshot:
     """Fetch, normalize, geo-tag and sort nearby aircraft."""
-    home_lat = config.HOME_LAT if home_lat is None else home_lat
-    home_lon = config.HOME_LON if home_lon is None else home_lon
-    radius = config.RADIUS_NM if radius is None else radius
+    s = settings.load()
+    home_lat = s["home_lat"] if home_lat is None else home_lat
+    home_lon = s["home_lon"] if home_lon is None else home_lon
+    radius = s["radius_nm"] if radius is None else radius
+    visible_alt = s["visible_alt_ft"]
 
     try:
         raw = _fetch_raw(config.GEG_LAT, config.GEG_LON, radius)
@@ -181,11 +185,13 @@ def get_snapshot(
         if ac.lat is not None and ac.lon is not None:
             ac.distance_nm = haversine_nm(home_lat, home_lon, ac.lat, ac.lon)
             ac.bearing = bearing_deg(home_lat, home_lon, ac.lat, ac.lon)
-        ac.tag = classify(ac)
+        ac.visible = ac.alt_ft is not None and ac.alt_ft <= visible_alt
+        ac.tag = classify(ac, visible_alt, config.OVERFLIGHT_ALT_FT)
         flights.append(ac)
 
     # visible/low aircraft first, then nearest.
     flights.sort(key=lambda a: (not a.visible, a.distance_nm))
+    routes.enrich(flights)   # attach origin/dest to airline flights (cached)
     return Snapshot(flights=flights, source="airplanes.live", fetched_at=time.time())
 
 
