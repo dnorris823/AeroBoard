@@ -1,0 +1,3 @@
+# AeroBoard has NO third-party Python dependencies.
+# The server and data layer use only the standard library.
+# The UI runs in a browser (Chromium kiosk on the Pi).
