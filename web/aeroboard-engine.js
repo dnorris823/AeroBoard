@@ -214,6 +214,24 @@
     const findFlight = (hex) => data.flights.find(f => f.hex === hex);
     const addHit = (x, y, w, h, fn) => hits.push({ x, y, w, h, fn });
 
+    // ---- active weather ---------------------------------------------------
+    // A fixed "weather scene" theme (t4) keeps its own baked-in condition. A
+    // time-of-day theme (dawn/day/dusk/night, and "auto" which cycles them)
+    // instead shows the *live* METAR pushed in via setData, so the sky over the
+    // board matches the sky over GEG. Returns null when there's nothing to show.
+    const liveWx = () => (data.weather && data.weather.state) ? data.weather : null;
+    function wxState() {
+      if (theme.weather) return theme.weather;
+      if (theme.scene3 && liveWx()) return liveWx().state;
+      return null;
+    }
+    function wxInfo() {
+      const st = wxState();
+      if (!st) return null;
+      if (!theme.weather && liveWx() && liveWx().state === st) return liveWx();
+      return WX[st];
+    }
+
     // ---- text (adds a soft shadow over the busy full scene for legibility) ----
     function text(s, x, y, color, size = 11, o = {}) {
       const b = o.bold ? 'bold ' : '';
@@ -267,20 +285,22 @@
       else if (type === 'overcast') rect(x, y + 3, 5, 2, '#9aa6b8');
     }
     function drawWxRibbon(yy) {
-      const w = WX[theme.weather];
+      const w = wxInfo(); if (!w) return;
+      const st = wxState();
+      const live = !theme.weather;
       rect(0, yy, W, 13, C.panel); rect(0, yy + 13, W, 1, C.line);
-      wxGlyph(5, yy + 2, theme.weather);
+      wxGlyph(5, yy + 2, st);
       text(w.label, 18, yy + 3, C.amber, 9, { bold: true });
-      text(w.tempF + '°F', 90, yy + 3, C.ink, 9, { bold: true });
+      if (w.tempF != null) text(w.tempF + '°F', 90, yy + 3, C.ink, 9, { bold: true });
       bearingTri(132, yy + 8, w.windDir, 4, C.green);
       text(w.windDir + '° ' + w.windKt + 'KT', 140, yy + 3, C.green, 9);
       text('VIS ' + w.visSM, 224, yy + 3, C.dim, 9);
-      text('GEG ATIS', W - 4, yy + 3, C.faint, 8, { right: true });
+      text(live ? 'GEG METAR' : 'GEG ATIS', W - 4, yy + 3, C.faint, 8, { right: true });
     }
     function wxMini(x, yy) {
-      const w = WX[theme.weather];
-      wxGlyph(x, yy + 1, theme.weather);
-      text(w.label + ' ' + w.tempF + '°', x + 14, yy + 2, C.dim, 9);
+      const w = wxInfo(); if (!w) return;
+      wxGlyph(x, yy + 1, wxState());
+      text(w.label + (w.tempF != null ? ' ' + w.tempF + '°' : ''), x + 14, yy + 2, C.dim, 9);
     }
 
     // ---- split-flap tile row ----
@@ -461,7 +481,7 @@
     }
     function drawFullScene() {
       const p = P();
-      const wx = theme.weather || 'clear';
+      const wx = wxState() || 'clear';
       // sky
       const sky = p.sky;
       const g = ctx.createLinearGradient(0, 0, 0, p.hy);
@@ -648,7 +668,7 @@
       text('TRACKING ' + d.tracking, W - 20, 4, C.dim, 10, { right: true });
       text('⚙', W - 9, 3, C.dim, 12, { center: true });
       addHit(W - 18, 0, 18, 16, () => { if (opts.onSettings) opts.onSettings(); else view = 'settings'; });
-      const wxOn = !!theme.weather;
+      const wxOn = !!wxState();
       if (wxOn) drawWxRibbon(16);
       const hb = wxOn ? 29 : 16;
 
@@ -682,7 +702,7 @@
         addHit(listX, y, listW, rowH - 2, () => { selectedHex = ac.hex; view = 'detail'; });
       });
 
-      const rx = 256, ry = (theme.weather ? 31 : 18), rw = W - rx - 3, rh = 118;
+      const rx = 256, ry = (wxOn ? 31 : 18), rw = W - rx - 3, rh = 118;
       rect(rx, ry, rw, rh, C.inner); stroke(rx, ry, rw, rh, C.line);
       text('RADAR ' + d.radius_nm + 'NM', rx + 4, ry + 3, C.green, 9);
       text('⤢', rx + rw - 9, ry + 3, C.dim, 9);
@@ -713,7 +733,7 @@
     function drawDetail(d) {
       rect(0, 0, W, 16, C.panel); rect(0, 16, W, 1, C.line);
       backButton();
-      if (theme.weather) wxMini(150, 3);
+      if (wxState()) wxMini(150, 3);
       const ac = findFlight(selectedHex);
       if (!ac) {
         text('SIGNAL LOST', W / 2, 90, C.red, 14, { bold: true, center: true });
@@ -777,7 +797,7 @@
       backButton();
       text('RADAR · ' + d.radius_nm + ' NM', W / 2, 4, C.green, 11, { bold: true, center: true, glow: theme.crt });
       text('TRACKING ' + d.tracking, W - 4, 4, C.dim, 10, { right: true });
-      if (theme.weather) wxMini(214, 18);
+      if (wxState()) wxMini(214, 18);
       if (theme.glass) { rect(6, 22, 250, H - 32, C.glassList); }
       if (d.location_label) text('◎ ' + d.location_label.slice(0, 22), 132, 19, C.dim, 8, { center: true });
       drawRadarWidget(d, 132, 122, 84, true);
@@ -811,7 +831,7 @@
       rect(0, 0, W, 16, C.panel); rect(0, 16, W, 1, C.line);
       backButton();
       text('SETTINGS', W / 2, 4, C.ink, 11, { bold: true, center: true });
-      if (theme.weather) wxMini(292, 3);
+      if (wxState()) wxMini(292, 3);
       const rows = [
         ['LOCATION', 'GEG · Spokane Intl', C.ink],
         ['ADDRESS', 'set via address lookup', C.dim],

@@ -94,13 +94,13 @@
     <label class="f">Theme</label>
     <select id="theme">
       <option value="auto">Auto — follow the local time of day</option>
-      <optgroup label="Fixed time of day">
+      <optgroup label="Fixed time of day (live weather)">
         <option value="dawn3">Dawn</option>
         <option value="day3">Day</option>
         <option value="dusk3">Dusk</option>
         <option value="night3">Night</option>
       </optgroup>
-      <optgroup label="Weather scenes">
+      <optgroup label="Fixed weather scenes">
         <option value="ovc4">Overcast · day</option>
         <option value="rain4">Rain · dusk</option>
         <option value="snow4">Snow · night</option>
@@ -117,7 +117,9 @@
       </optgroup>
     </select>
     <p class="hint">“Auto” follows the clock — dawn, day, dusk and night scenes swap
-      themselves. The others are fixed looks. Takes effect when the board reloads.</p>
+      themselves. Those time-of-day looks also carry a live weather bar and paint
+      the current sky over GEG (from the KGEG METAR). The fixed weather scenes show
+      one baked-in condition instead. Takes effect when the board reloads.</p>
   </fieldset>
 
   <button type="button" class="save" id="saveBtn">SAVE</button>

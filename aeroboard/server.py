@@ -17,7 +17,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import config, settings
+from . import config, settings, weather
 from .data import compass, get_snapshot
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -59,6 +59,7 @@ def _snapshot_json() -> bytes:
         "radius_nm": s["radius_nm"],
         "location_label": s["location_label"],
         "airport": "GEG",
+        "weather": weather.get_weather(),   # live METAR (may be None if unreachable)
     }
     return json.dumps(body).encode()
 

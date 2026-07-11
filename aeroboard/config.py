@@ -36,6 +36,10 @@ API_ENDPOINTS = (
 USER_AGENT = "AeroBoard/0.1 (hobby flight board; contact: dnorris)"
 HTTP_TIMEOUT = 12  # seconds
 
+# Live weather: KGEG METAR from aviationweather.gov (free, JSON, no API key).
+METAR_STATION = "KGEG"
+METAR_URL = "https://aviationweather.gov/api/data/metar?ids={station}&format=json"
+
 # Display: internal pixel-art canvas (16:9), scaled up to the panel.
 INT_W = 384
 INT_H = 216
