@@ -663,7 +663,7 @@
       const hasBand = theme.scene !== 'none';
       rect(0, 0, W, 15, C.panel); rect(0, 15, W, 1, C.line);
       text('GEG', 5, 3, C.amber, 12, { bold: true, glow: theme.crt ? true : ((theme.id === 'night' || theme.id === 'night2' || theme.id === 'night3') ? C.glow : false) });
-      text('SPOKANE INTL', 32, 4, C.dim, 10);
+      text('SPOKANE INTL', 40, 4, C.dim, 10);
       text(clock().hhmm, W / 2, 3, C.ink, 12, { bold: true, center: true });
       text('TRACKING ' + d.tracking, W - 20, 4, C.dim, 10, { right: true });
       text('⚙', W - 9, 3, C.dim, 12, { center: true });
@@ -686,8 +686,8 @@
         rect(listX, y, 2, rowH - 2, col);
         if (theme.flap === 'full') flapRow(ac.label, listX + 7, y + 1, 8, 9, C.ink);
         else text(ac.label, listX + 7, y + 1, C.ink, 12, { bold: true });
-        text(ac.type || '----', listX + 74, y + 2, C.dim, 11);
-        if (ac.origin && ac.dest) text(ac.origin + '→' + ac.dest, listX + 116, y + 2, C.blue, 10);
+        text(ac.type || '----', listX + 90, y + 2, C.dim, 11);
+        if (ac.origin && ac.dest) text(ac.origin + '→' + ac.dest, listX + 127, y + 2, C.blue, 10);
         text(ac.tag, listX + listW - 4, y + 2, col, 9, { right: true });
         const ly = y + 14;
         if (ac.alt_ft !== null) {
@@ -702,27 +702,30 @@
         addHit(listX, y, listW, rowH - 2, () => { selectedHex = ac.hex; view = 'detail'; });
       });
 
-      const rx = 256, ry = (wxOn ? 31 : 18), rw = W - rx - 3, rh = 118;
+      // The weather ribbon pushes the radar down by 13px (ry 18 -> 31); shrink the
+      // radar by the same amount so its bottom edge — and everything stacked under
+      // it — stays put whether or not the ribbon is showing.
+      const rx = 256, ry = (wxOn ? 31 : 18), rw = W - rx - 3, rh = wxOn ? 105 : 118;
       rect(rx, ry, rw, rh, C.inner); stroke(rx, ry, rw, rh, C.line);
       text('RADAR ' + d.radius_nm + 'NM', rx + 4, ry + 3, C.green, 9);
       text('⤢', rx + rw - 9, ry + 3, C.dim, 9);
       drawRadarWidget(d, rx + rw / 2, ry + rh / 2 + 6, Math.min(rw, rh) / 2 - 11, false);
       addHit(rx, ry, rw, rh, () => { view = 'radar'; });
 
-      let sx = rx + 3, sy = ry + 124;
-      if (theme.glass) rect(sx - 3, sy - 3, rw + 3, H - sy - 11, C.glassList);
+      let sx = rx + 3, sy = ry + rh + 5;
+      if (theme.glass) rect(sx - 3, sy - 3, rw + 3, H - sy - 13, C.glassList);
       text('IN RANGE', sx, sy, C.dim, 9);
-      let cyy = sy + 12;
+      let cyy = sy + 11;
       for (const tag of ['APPROACH', 'DEPARTURE', 'LOW', 'GA', 'OVERFLIGHT']) {
         const n = (d.counts || {})[tag]; if (!n) continue;
         const c = TAG[tag] || C.dim; rect(sx, cyy + 1, 5, 5, c);
         text(tag.slice(0, 4), sx + 9, cyy, C.dim, 9);
         text(String(n), sx + 52, cyy, c, 9, { right: true });
-        cyy += 11;
+        cyy += 9;
       }
 
       if (hasBand) drawScene(0, H - sceneH, W, sceneH);
-      else { footer(d); text('TAP A FLIGHT · TAP RADAR', W / 2, H - 11, C.faint, 8, { center: true }); }
+      else footer(d);
     }
 
     // ============================ DETAIL ============================
@@ -797,7 +800,6 @@
       backButton();
       text('RADAR · ' + d.radius_nm + ' NM', W / 2, 4, C.green, 11, { bold: true, center: true, glow: theme.crt });
       text('TRACKING ' + d.tracking, W - 4, 4, C.dim, 10, { right: true });
-      if (wxState()) wxMini(214, 18);
       if (theme.glass) { rect(6, 22, 250, H - 32, C.glassList); }
       if (d.location_label) text('◎ ' + d.location_label.slice(0, 22), 132, 19, C.dim, 8, { center: true });
       drawRadarWidget(d, 132, 122, 84, true);
@@ -926,9 +928,26 @@
     });
     canvas.__setView = (v) => { if (v === 'detail' && !selectedHex) selectedHex = data.flights[0].hex; view = v; };
 
-    let raf = requestAnimationFrame(loop);
+    // The whole board is laid out on a fixed pixel grid tuned for the Silkscreen /
+    // VT323 pixel fonts. Those fonts are only ever painted on the canvas, never in
+    // the DOM — and WebKit (iPad Safari) won't download an @font-face that isn't
+    // matched to DOM text, so the canvas would fall back to a wide system monospace
+    // and every label would overflow its box. Ask the Font Loading API to fetch them
+    // explicitly (Safari honours this) and hold the first paint until they're ready,
+    // with a timeout so a slow/offline font load never leaves the screen blank.
+    let raf = 0, destroyed = false;
+    function begin() { if (!destroyed && !raf) raf = requestAnimationFrame(loop); }
+    const fontsToLoad = ["700 16px 'Silkscreen'", "400 16px 'Silkscreen'", "400 16px 'VT323'"];
+    if (window.document && document.fonts && document.fonts.load) {
+      Promise.race([
+        Promise.all(fontsToLoad.map(f => document.fonts.load(f).catch(() => {}))),
+        new Promise(r => setTimeout(r, 1500)),
+      ]).then(begin);
+    } else {
+      begin();
+    }
     return {
-      destroy() { cancelAnimationFrame(raf); },
+      destroy() { destroyed = true; cancelAnimationFrame(raf); },
       setData(nd) { if (nd) data = nd; },
       setTheme(id) {
         if (id === 'auto') { autoMode = true; applyTheme(autoThemeId()); }
