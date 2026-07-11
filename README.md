@@ -4,7 +4,8 @@ A pixel-art flight board for the skies over **Spokane International (GEG)** — 
 the planes on approach that you can actually see, in a small airport/ATC-styled UI.
 Runs in a browser now; the finished piece runs on a Raspberry Pi driving a 5.5" AMOLED.
 
-> Status: **v0 — functional.** Live data + a basic airport UI. Theming is next.
+> Status: **v1 — themed.** Live data + a pixel-art airport UI with 15 looks
+> (auto time-of-day, weather scenes, full-bleed landscapes and a CRT scope).
 > See [VISION.md](VISION.md) for the full design and [BOM.md](BOM.md) for hardware.
 
 ## Run it now (dev, in your browser)
@@ -42,8 +43,10 @@ adsbdb.com  ─────▶ + geo-tag + route     + /api/settings         (bo
 - **`settings.py`** — user location/radius/threshold, persisted to `settings.json`.
 - **`server.py`** — zero-dependency HTTP server: serves the UI + `/api/flights`,
   `/api/settings` (GET/POST), and `/api/geocode` (address → coordinates).
-- **`web/index.html`** — the board, flight-detail, and radar views (384×216 canvas).
-- **`web/settings.html`** — the settings form.
+- **`web/index.html`** — mounts the pixel engine full-screen and feeds it live data.
+- **`web/aeroboard-engine.js`** — the themeable renderer: board, flight-detail, radar
+  and settings views, 15 themes, split-flap, scene art and CRT effects.
+- **`web/settings.html`** — the settings form (location, traffic, theme).
 
 ## Settings
 
@@ -53,6 +56,11 @@ Tap the **⚙ gear** on the board (or open **`/settings`**) to set:
   location, or enter latitude/longitude by hand. This is where distances and the
   "look" direction are measured from.
 - **Search radius** and the **"visible" altitude ceiling**.
+- **Theme** — the board's look. **Auto** follows the local clock (dawn / day / dusk /
+  night scenes swap themselves); or pin a fixed time-of-day, a weather scene
+  (overcast / rain / snow / fog), a full-bleed landscape, or the Radar-Ops CRT.
+  All 15 themes render the same board / detail / radar / settings views; the pixel
+  art lives in `web/aeroboard-engine.js` (`window.AeroBoard.mount`).
 
 Saved to `settings.json` (gitignored); the board picks it up on its next refresh.
 Defaults live in `aeroboard/config.py`.

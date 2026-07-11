@@ -4,9 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AeroBoard · GEG</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
 <style>
   html,body{margin:0;height:100%;background:#000;overflow:hidden;}
   body{display:grid;place-items:center;}
+  /* The engine sizes the canvas backing store (384×216 or 512×288); CSS just
+     scales it to fill the panel, keeping 16:9 and hard pixel edges. */
   #screen{
     width:min(100vw, calc(100vh * 16 / 9));
     height:auto; aspect-ratio:16/9;
@@ -16,329 +22,44 @@
 </style>
 </head>
 <body>
-<canvas id="screen" width="384" height="216"></canvas>
+<canvas id="screen"></canvas>
+<script src="/aeroboard-engine.js"></script>
 <script>
 (() => {
   const cv = document.getElementById('screen');
-  const ctx = cv.getContext('2d');
-  const W = 384, H = 216;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const TZ = 'America/Los_Angeles';   // GEG lives in Spokane (Pacific)
 
-  // ---- palette (mirrors data classes) ----
-  const C = {
-    bg:'#080a10', panel:'#0e141e', panelHi:'#141e2e', line:'#202c40',
-    ink:'#e8ecf4', dim:'#7a8aa4', faint:'#4a566c',
-    amber:'#ffb24d', green:'#4dff9e', blue:'#5aa9ff', red:'#ff5b5b',
-  };
-  const TAG = {
-    APPROACH:C.amber, DEPARTURE:C.blue, LOW:C.green, GA:'#96d2b4',
-    OVERFLIGHT:C.faint, TRANSIT:C.dim, GROUND:C.faint,
-  };
-
-  // ---- offline sample (used only if the local server isn't reachable) ----
-  const SAMPLE = {
-    airport:'GEG', radius_nm:40, source:'sample', error:null, tracking:5,
-    location_label:'GEG (airport)',
-    counts:{APPROACH:2,DEPARTURE:1,GA:1,OVERFLIGHT:1},
-    flights:[
-      {hex:'a1b2c3',label:'SKW5612',reg:'N612SY',type:'E75L',alt_ft:2900,on_ground:false,gs_kt:139,track:210,vrate_fpm:-640,squawk:'4571',origin:'SEA',dest:'GEG',origin_city:'Seattle',dest_city:'Spokane',distance_nm:2.9,bearing:41,compass:'NE',tag:'APPROACH',visible:true},
-      {hex:'a2c4e6',label:'DAL1853',reg:'N301DN',type:'A320',alt_ft:5400,on_ground:false,gs_kt:216,track:225,vrate_fpm:-900,squawk:'3422',origin:'SLC',dest:'GEG',origin_city:'Salt Lake City',dest_city:'Spokane',distance_nm:11.1,bearing:47,compass:'NE',tag:'APPROACH',visible:true},
-      {hex:'b3d5f7',label:'N7908L',reg:'N7908L',type:'BE23',alt_ft:3275,on_ground:false,gs_kt:96,track:90,vrate_fpm:520,squawk:'1200',origin:null,dest:null,distance_nm:0.9,bearing:135,compass:'SE',tag:'DEPARTURE',visible:true},
-      {hex:'c4e6a8',label:'N738BS',reg:'N738BS',type:'C172',alt_ft:3300,on_ground:false,gs_kt:103,track:20,vrate_fpm:0,squawk:'1200',origin:null,dest:null,distance_nm:6.2,bearing:20,compass:'NNE',tag:'GA',visible:true},
-      {hex:'d5f7b9',label:'ACA109',reg:'C-GHQY',type:'A321',alt_ft:34000,on_ground:false,gs_kt:358,track:300,vrate_fpm:0,squawk:'2701',origin:'YVR',dest:'SFO',origin_city:'Vancouver',dest_city:'San Francisco',distance_nm:22,bearing:300,compass:'NW',tag:'OVERFLIGHT',visible:false},
-    ],
-  };
-
-  // ---- app state ----
-  let data = null, live = false;
-  let view = 'board';          // 'board' | 'detail' | 'radar'
-  let selectedHex = null;
-  let sweep = 0, lastT = performance.now();
-  let hits = [];               // tap zones, rebuilt every frame
-
-  const flights = () => (data || SAMPLE).flights;
-  const findFlight = (hex) => flights().find(f => f.hex === hex);
-  const addHit = (x, y, w, h, fn) => hits.push({x, y, w, h, fn});
-
-  // ---- primitives ----
-  function text(s, x, y, color, size=11, {bold=false, right=false, center=false} = {}) {
-    ctx.font = `${bold?'bold ':''}${size}px ui-monospace, Menlo, Monaco, Consolas, monospace`;
-    ctx.textBaseline = 'top';
-    ctx.fillStyle = color;
-    ctx.textAlign = center ? 'center' : (right ? 'right' : 'left');
-    ctx.fillText(s, x, y);
-    ctx.textAlign = 'left';
-  }
-  function bearingTri(cx, cy, deg, size, color) {
-    const a = deg*Math.PI/180, dx=Math.sin(a), dy=-Math.cos(a), px=Math.cos(a), py=Math.sin(a);
-    ctx.fillStyle = color; ctx.beginPath();
-    ctx.moveTo(cx+dx*size, cy+dy*size);
-    ctx.lineTo(cx-dx*size*.7+px*size*.6, cy-dy*size*.7+py*size*.6);
-    ctx.lineTo(cx-dx*size*.7-px*size*.6, cy-dy*size*.7-py*size*.6);
-    ctx.fill();
-  }
-  function vtri(x, y, color, up) {
-    ctx.fillStyle = color; ctx.beginPath();
-    if (up) { ctx.moveTo(x+3,y); ctx.lineTo(x,y+5); ctx.lineTo(x+6,y+5); }
-    else    { ctx.moveTo(x,y);   ctx.lineTo(x+6,y); ctx.lineTo(x+3,y+5); }
-    ctx.fill();
-  }
-  const rect = (x,y,w,h,c) => { ctx.fillStyle=c; ctx.fillRect(x,y,w,h); };
-  function stroke(x,y,w,h,c){ ctx.strokeStyle=c; ctx.lineWidth=1; ctx.strokeRect(x+.5,y+.5,w-1,h-1); }
-  function clock() {
-    const f = new Intl.DateTimeFormat('en-GB', {timeZone:'America/Los_Angeles',
-      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
-    const p = Object.fromEntries(f.formatToParts(new Date()).map(o=>[o.type,o.value]));
-    return {hhmm:`${p.hour}:${p.minute}`, hms:`${p.hour}:${p.minute}:${p.second}`};
-  }
-  function backButton(label='‹ BACK') {
-    text(label, 4, 3, C.amber, 11, {bold:true});
-    addHit(0, 0, 78, 16, () => { view = 'board'; });
-  }
-
-  // a compact radar; when big=true also draws a sweep + registers dot taps
-  function drawRadarWidget(d, cx, cy, R, {big=false} = {}) {
-    ctx.strokeStyle = '#173327';
-    for (const rr of [R, R*2/3, R/3]) { ctx.beginPath(); ctx.arc(cx,cy,rr,0,7); ctx.stroke(); }
-    ctx.beginPath(); ctx.moveTo(cx-R,cy); ctx.lineTo(cx+R,cy); ctx.moveTo(cx,cy-R); ctx.lineTo(cx,cy+R); ctx.stroke();
-    if (big) {
-      ['N','E','S','W'].forEach((lbl,i) => {
-        const a=i*Math.PI/2, x=cx+Math.sin(a)*(R+6), y=cy-Math.cos(a)*(R+6);
-        text(lbl, x, y-4, C.faint, 8, {center:true});
-      });
-      // sweep
-      const g = ctx.createLinearGradient(cx, cy, cx+Math.cos(sweep)*R, cy+Math.sin(sweep)*R);
-      g.addColorStop(0, 'rgba(77,255,158,.5)'); g.addColorStop(1, 'rgba(77,255,158,0)');
-      ctx.strokeStyle = g; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(sweep)*R, cy+Math.sin(sweep)*R); ctx.stroke();
-    } else {
-      text('N', cx, cy-R-9, C.faint, 8, {center:true});
-    }
-    for (const ac of d.flights) {
-      if (!ac.distance_nm) continue;
-      const rp = Math.min(1, ac.distance_nm/d.radius_nm)*R, a=ac.bearing*Math.PI/180;
-      const px = cx+rp*Math.sin(a), py = cy-rp*Math.cos(a);
-      const s = ac.visible ? (big?3:2) : (big?2:1);
-      rect(Math.round(px)-s/2, Math.round(py)-s/2, s, s, TAG[ac.tag]||C.dim);
-      if (big) addHit(px-6, py-6, 12, 12, () => { selectedHex = ac.hex; view = 'detail'; });
-    }
-    rect(cx-1, cy-1, 2, 2, C.amber);   // home
-  }
-
-  // ================= BOARD =================
-  function drawBoard(d) {
-    rect(0,0,W,15,C.panel); rect(0,15,W,1,C.line);
-    text('GEG',4,3,C.amber,12,{bold:true});
-    text('SPOKANE INTL',30,4,C.dim,10);
-    text(clock().hhmm, W/2, 3, C.ink, 12, {bold:true, center:true});
-    text(`TRACKING ${d.tracking}`, W-20, 4, C.dim, 10, {right:true});
-    text('⚙', W-9, 3, C.dim, 12, {center:true});
-    addHit(W-18, 0, 18, 16, () => { location.href = '/settings'; });
-
-    const top=18, rowH=25, listX=3, listW=248;
-    const maxRows = Math.floor((H-top-14)/rowH);
-    if (!d.flights.length && !d.error) text('quiet skies over GEG', listX+8, top+20, C.dim, 12);
-    d.flights.slice(0,maxRows).forEach((ac,i) => {
-      const y = top+i*rowH;
-      const col = TAG[ac.tag]||C.dim;
-      if (ac.visible) rect(listX,y,listW,rowH-2,C.panelHi);
-      rect(listX,y,2,rowH-2,col);
-      text(ac.label, listX+7, y+1, C.ink, 12, {bold:true});
-      text(ac.type||'----', listX+74, y+2, C.dim, 11);
-      if (ac.origin && ac.dest) text(`${ac.origin}→${ac.dest}`, listX+116, y+2, C.blue, 10);
-      text(ac.tag, listX+listW-4, y+2, col, 9, {right:true});
-      const ly = y+14;
-      if (ac.alt_ft !== null) {
-        const vr = ac.vrate_fpm||0;
-        if (Math.abs(vr) >= 300) vtri(listX+7, ly+2, vr>0?C.green:C.amber, vr>0);
-        text(ac.on_ground?'GND':`${ac.alt_ft.toLocaleString()}FT`, listX+15, ly, C.green, 10);
-      }
-      if (ac.gs_kt) text(`${ac.gs_kt}KT`, listX+78, ly, C.dim, 10);
-      text(`${ac.distance_nm}NM`, listX+128, ly, C.dim, 10);
-      text(ac.compass, listX+186, ly, C.ink, 10);
-      if (ac.compass) bearingTri(listX+212, ly+5, ac.bearing, 4, col);
-      addHit(listX, y, listW, rowH-2, () => { selectedHex = ac.hex; view = 'detail'; });
+  function boot(theme) {
+    const app = window.AeroBoard.mount(cv, theme || 'auto', {
+      timeZone: TZ,
+      onSettings: () => { location.href = '/settings'; },
     });
 
-    // radar panel (tap -> fullscreen radar)
-    const rx=256, ry=18, rw=W-rx-3, rh=118;
-    rect(rx,ry,rw,rh,'#0a0e16'); stroke(rx,ry,rw,rh,C.line);
-    text(`RADAR ${d.radius_nm}NM`, rx+4, ry+3, C.green, 9);
-    text('⤢', rx+rw-9, ry+3, C.dim, 9);
-    drawRadarWidget(d, rx+rw/2, ry+rh/2+6, Math.min(rw,rh)/2-11);
-    addHit(rx, ry, rw, rh, () => { view = 'radar'; });
-
-    // in-range summary
-    let sx=rx+3, sy=ry+124;
-    text('IN RANGE', sx, sy, C.dim, 9);
-    let cy=sy+12;
-    for (const tag of ['APPROACH','DEPARTURE','LOW','GA','OVERFLIGHT']) {
-      const n=(d.counts||{})[tag]; if(!n) continue;
-      const c=TAG[tag]||C.dim; rect(sx,cy+1,5,5,c);
-      text(tag.slice(0,4), sx+9, cy, C.dim, 9);
-      text(String(n), sx+52, cy, c, 9, {right:true});
-      cy+=11;
+    // Live data: poll the local server; fall back to the built-in sample if it's
+    // unreachable so the board still renders.
+    async function poll() {
+      try {
+        const r = await fetch('/api/flights', { cache: 'no-store' });
+        if (!r.ok) throw new Error(r.status);
+        const d = await r.json();
+        d.live = true;
+        app.setData(d);
+      } catch (e) { /* keep last snapshot / the sample */ }
     }
-    footer(d);
-    text('TAP A FLIGHT · TAP RADAR', W/2, H-11, C.faint, 8, {center:true});
+    poll();
+    setInterval(poll, 10000);
   }
 
-  // ================= DETAIL =================
-  function fieldRow(x, y, label, value, valColor=C.ink) {
-    text(label, x, y, C.dim, 9);
-    text(value, x, y+9, valColor, 13, {bold:true});
-  }
-  function drawDetail(d) {
-    rect(0,0,W,16,C.panel); rect(0,16,W,1,C.line);
-    backButton();
-    const ac = findFlight(selectedHex);
-    if (!ac) {
-      text('SIGNAL LOST', W/2, 90, C.red, 14, {bold:true, center:true});
-      text('that aircraft left the area', W/2, 110, C.dim, 10, {center:true});
-      text('‹ back to board', W/2, 130, C.amber, 10, {center:true});
-      addHit(0,0,W,H, () => { view='board'; });
-      return;
-    }
-    const col = TAG[ac.tag]||C.dim;
-    text(ac.tag, W-4, 4, col, 10, {right:true, bold:true});
-
-    // headline + route
-    text(ac.label, 12, 22, C.ink, 22, {bold:true});
-    const routeStr = (ac.origin && ac.dest) ? `${ac.origin} → ${ac.dest}` : null;
-    if (routeStr) {
-      text(routeStr, 12, 46, C.blue, 15, {bold:true});
-      const cities = [ac.origin_city, ac.dest_city].filter(Boolean).join(' → ');
-      text(`${ac.type||'—'} · ${ac.reg||'—'}${cities ? '   ·   '+cities : ''}`, 12, 64, C.dim, 9);
-    } else {
-      text(`${ac.type||'—'}  ·  ${ac.reg||'—'}`, 12, 48, C.dim, 11);
-      text('scheduled route unavailable', 12, 64, C.faint, 9);
-    }
-    rect(12, 76, W-24, 1, C.line);
-
-    // left stats
-    const lx=14; let ly=82;
-    const alt = ac.on_ground ? 'ON GROUND' : (ac.alt_ft!=null?`${ac.alt_ft.toLocaleString()} FT`:'—');
-    fieldRow(lx, ly, 'ALTITUDE', alt, C.green);
-    if (ac.vrate_fpm && Math.abs(ac.vrate_fpm)>=100) {
-      const up = ac.vrate_fpm>0;
-      vtri(lx+96, ly+13, up?C.green:C.amber, up);
-      text(`${Math.abs(ac.vrate_fpm)} fpm`, lx+106, ly+11, C.dim, 9);
-    }
-    ly+=30; fieldRow(lx, ly, 'GROUND SPEED', ac.gs_kt!=null?`${ac.gs_kt} KT`:'—');
-    ly+=30; fieldRow(lx, ly, 'HEADING', ac.track!=null?`${ac.track}°`:'—');
-    if (ac.track!=null) bearingTri(lx+70, ly+16, ac.track, 5, C.ink);
-    ly+=30; fieldRow(lx, ly, 'SQUAWK', ac.squawk||'—');
-
-    // right: LOOK panel
-    const px=236, pw=W-px-8;
-    rect(px,78,pw,H-92,'#0a0e16'); stroke(px,78,pw,H-92,C.line);
-    text('LOOK', px+pw/2, 84, C.dim, 9, {center:true});
-    const cx=px+pw/2, cy=128;
-    ctx.strokeStyle=C.line; ctx.beginPath(); ctx.arc(cx,cy,26,0,7); ctx.stroke();
-    bearingTri(cx, cy, ac.bearing, 20, col);
-    text(ac.compass||'—', cx, cy+30, C.ink, 16, {bold:true, center:true});
-    text(`${Math.round(ac.bearing)}°  ·  ${ac.distance_nm} NM`, cx, cy+50, C.dim, 9, {center:true});
-
-    footer(d);
+  // Read the saved look, then start. Default to the auto time-of-day theme.
+  function start() {
+    fetch('/api/settings', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(s => boot(s.theme || 'auto'))
+      .catch(() => boot('auto'));
   }
 
-  // ================= RADAR =================
-  function computeStats(d) {
-    const air = d.flights.filter(f => !f.on_ground && f.distance_nm>0);
-    const min = (arr,key) => arr.length ? arr.reduce((a,b)=>b[key]<a[key]?b:a) : null;
-    const max = (arr,key) => arr.length ? arr.reduce((a,b)=>b[key]>a[key]?b:a) : null;
-    return {
-      closest: min(air.filter(f=>f.distance_nm!=null),'distance_nm'),
-      lowest:  min(air.filter(f=>f.alt_ft!=null),'alt_ft'),
-      fastest: max(air.filter(f=>f.gs_kt!=null),'gs_kt'),
-      visible: d.flights.filter(f=>f.visible).length,
-    };
-  }
-  function drawRadarView(d) {
-    rect(0,0,W,16,C.panel); rect(0,16,W,1,C.line);
-    backButton();
-    text(`RADAR · ${d.radius_nm} NM`, W/2, 4, C.green, 11, {bold:true, center:true});
-    text(`TRACKING ${d.tracking}`, W-4, 4, C.dim, 10, {right:true});
-    if (d.location_label) text('◎ ' + d.location_label.slice(0,22), 132, 19, C.dim, 8, {center:true});
-
-    drawRadarWidget(d, 132, 122, 84, {big:true});
-
-    // stats panel
-    const sx=252, pw=W-sx-6; let sy=26;
-    rect(sx,sy,pw,H-sy-8,'#0a0e16'); stroke(sx,sy,pw,H-sy-8,C.line);
-    const ix=sx+7; let iy=sy+7;
-    text('IN RANGE', ix, iy, C.dim, 9); iy+=13;
-    for (const tag of ['APPROACH','DEPARTURE','LOW','GA','OVERFLIGHT','GROUND']) {
-      const n=(d.counts||{})[tag]; if(!n) continue;
-      const c=TAG[tag]||C.dim; rect(ix,iy+1,5,5,c);
-      text(tag.slice(0,4), ix+9, iy, C.dim, 9);
-      text(String(n), ix+pw-16, iy, c, 9, {right:true});
-      iy+=11;
-    }
-    iy+=4; rect(ix,iy,pw-14,1,C.line); iy+=6;
-    const st = computeStats(d);
-    const line = (lbl, ac, extra) => {
-      text(lbl, ix, iy, C.dim, 8); iy+=9;
-      text(ac ? `${ac.label} ${extra(ac)}` : '—', ix, iy, C.ink, 9); iy+=13;
-    };
-    line('CLOSEST', st.closest, a=>`${a.distance_nm}NM`);
-    line('LOWEST',  st.lowest,  a=>`${a.alt_ft.toLocaleString()}FT`);
-    line('FASTEST', st.fastest, a=>`${a.gs_kt}KT`);
-    text('VISIBLE NOW', ix, iy, C.dim, 8); iy+=9;
-    text(String(st.visible), ix, iy, C.green, 9, {bold:true});
-
-    text('TAP A BLIP FOR DETAIL', 132, H-9, C.faint, 8, {center:true});
-  }
-
-  // ---- shared footer ----
-  function footer(d) {
-    const y=H-12; rect(0,y,W,1,C.line);
-    if (d.error) text('NO SIGNAL — retrying', 4, y+1, C.red, 9);
-    else {
-      text(`SRC ${d.source}`, 4, y+1, C.faint, 9);
-      text(live?'LIVE':'SAMPLE', 128, y+1, live?C.green:C.amber, 9);
-    }
-    text(`${clock().hms} PT`, W-4, y+1, C.dim, 9, {right:true});
-  }
-
-  // ---- frame ----
-  function draw() {
-    const d = data || SAMPLE;
-    hits = [];
-    rect(0,0,W,H,C.bg);
-    if (view === 'detail') drawDetail(d);
-    else if (view === 'radar') drawRadarView(d);
-    else drawBoard(d);
-  }
-  function loop(now) {
-    const dt = (now - lastT)/1000; lastT = now;
-    if (!reduce) sweep = (sweep + dt*1.4) % (Math.PI*2);
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  // ---- input (mouse now, touch on the panel — same handler) ----
-  cv.addEventListener('pointerdown', (e) => {
-    const r = cv.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width * W;
-    const y = (e.clientY - r.top) / r.height * H;
-    for (let i = hits.length - 1; i >= 0; i--) {           // topmost first
-      const h = hits[i];
-      if (x>=h.x && x<=h.x+h.w && y>=h.y && y<=h.y+h.h) { h.fn(); return; }
-    }
-  });
-
-  // ---- data ----
-  async function poll() {
-    try {
-      const r = await fetch('/api/flights', {cache:'no-store'});
-      if (!r.ok) throw new Error(r.status);
-      data = await r.json(); live = true;
-    } catch (e) { live = false; if (!data) data = SAMPLE; }
-  }
-  poll();
-  setInterval(poll, 10000);
-  requestAnimationFrame(loop);
+  if (window.AeroBoard) start();
+  else addEventListener('load', start);
 })();
 </script>
 </body>

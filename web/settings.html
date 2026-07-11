@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AeroBoard · Settings</title>
+<link rel="icon" href="data:,">
 <style>
   :root{
     --bg:#080a10; --panel:#0e141e; --panel2:#0b0f17; --line:#202c40;
@@ -26,6 +27,11 @@
     font-family:var(--mono);font-size:15px;padding:11px 12px;border-radius:6px;
   }
   input:focus{outline:2px solid var(--blue);outline-offset:1px;}
+  select{
+    width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+    font-family:var(--mono);font-size:15px;padding:11px 12px;border-radius:6px;
+  }
+  select:focus{outline:2px solid var(--blue);outline-offset:1px;}
   .row{display:flex;gap:12px;} .row > div{flex:1;}
   .searchbar{display:flex;gap:8px;margin-top:5px;}
   .searchbar input{flex:1;}
@@ -83,6 +89,37 @@
       the top of the board.</p>
   </fieldset>
 
+  <fieldset>
+    <legend>Appearance</legend>
+    <label class="f">Theme</label>
+    <select id="theme">
+      <option value="auto">Auto — follow the local time of day</option>
+      <optgroup label="Fixed time of day">
+        <option value="dawn3">Dawn</option>
+        <option value="day3">Day</option>
+        <option value="dusk3">Dusk</option>
+        <option value="night3">Night</option>
+      </optgroup>
+      <optgroup label="Weather scenes">
+        <option value="ovc4">Overcast · day</option>
+        <option value="rain4">Rain · dusk</option>
+        <option value="snow4">Snow · night</option>
+        <option value="fog4">Fog · dawn</option>
+      </optgroup>
+      <optgroup label="Classic (compact board)">
+        <option value="night">Cozy Night Airport</option>
+        <option value="poster">Golden-Age Travel Poster</option>
+        <option value="crt">Radar-Ops CRT</option>
+      </optgroup>
+      <optgroup label="Full-scene">
+        <option value="night2">Cozy Night — full scene</option>
+        <option value="poster2">Golden-Age Poster — full scene</option>
+      </optgroup>
+    </select>
+    <p class="hint">“Auto” follows the clock — dawn, day, dusk and night scenes swap
+      themselves. The others are fixed looks. Takes effect when the board reloads.</p>
+  </fieldset>
+
   <button type="button" class="save" id="saveBtn">SAVE</button>
   <div class="status" id="status"></div>
 </div>
@@ -102,6 +139,7 @@
     $('lat').value = s.home_lat; $('lon').value = s.home_lon;
     $('label').value = s.location_label || '';
     $('radius').value = s.radius_nm; $('vis').value = s.visible_alt_ft; fmt();
+    $('theme').value = s.theme || 'auto';
   }).catch(()=>{});
 
   // address search
@@ -149,6 +187,7 @@
       location_label: $('label').value.trim() || 'Home',
       radius_nm: parseInt($('radius').value, 10),
       visible_alt_ft: parseInt($('vis').value, 10),
+      theme: $('theme').value,
     };
     try{
       const r = await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});

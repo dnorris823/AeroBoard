@@ -22,6 +22,17 @@ DEFAULTS = {
     "location_label": "GEG (airport)",
     "radius_nm": config.RADIUS_NM,
     "visible_alt_ft": config.VISIBLE_ALT_FT,
+    "theme": "auto",
+}
+
+# Pixel-art looks the board can wear (see web/aeroboard-engine.js). "auto"
+# follows the local clock, cycling the dawn/day/dusk/night scenes.
+THEMES = {
+    "auto",
+    "night", "poster", "crt",           # t1 — compact board
+    "night2", "poster2",                # t2 — full-scene
+    "dawn3", "day3", "dusk3", "night3",  # t3 — fixed time of day
+    "ovc4", "rain4", "snow4", "fog4",   # t4 — weather scenes
 }
 
 
@@ -56,6 +67,8 @@ def _coerce(patch: dict) -> dict:
     num("visible_alt_ft", 500, 45000, int)
     if "location_label" in patch and patch["location_label"] is not None:
         out["location_label"] = str(patch["location_label"])[:48]
+    if patch.get("theme") in THEMES:
+        out["theme"] = patch["theme"]
     return out
 
 
