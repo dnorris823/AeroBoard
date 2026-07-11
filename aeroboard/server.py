@@ -22,6 +22,16 @@ from .data import compass, get_snapshot
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
+_CONTENT_TYPES = {
+    ".js": "text/javascript",
+    ".css": "text/css",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".json": "application/json",
+    ".webmanifest": "application/manifest+json",
+    ".ico": "image/x-icon",
+}
+
 
 def _flight_dict(ac) -> dict:
     return {
@@ -116,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         target = (WEB_DIR / path.lstrip("/")).resolve()
         if str(target).startswith(str(WEB_DIR)) and target.is_file():
-            ctype = "text/javascript" if target.suffix == ".js" else "text/plain"
+            ctype = _CONTENT_TYPES.get(target.suffix, "text/plain")
             self._send(200, target.read_bytes(), ctype)
             return
         self._send(404, b"not found", "text/plain")
