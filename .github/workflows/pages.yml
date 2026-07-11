@@ -2,6 +2,7 @@ name: Deploy AeroBoard to GitHub Pages
 
 # Publishes the static web/ folder to GitHub Pages. The whole app runs
 # client-side, so this is all the hosting it needs.
+# Deploys on changes to web/ or this workflow; also runnable on demand.
 
 on:
   push:
