@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AeroBoard · Settings</title>
-<link rel="icon" href="data:,">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080a10">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <style>
   :root{
     --bg:#080a10; --panel:#0e141e; --panel2:#0b0f17; --line:#202c40;
@@ -55,7 +60,7 @@
 </head>
 <body>
 <div class="wrap">
-  <a class="back" href="/">‹ BACK TO BOARD</a>
+  <a class="back" href="index.html">‹ BACK TO BOARD</a>
   <h1>SETTINGS</h1>
   <p class="sub">AeroBoard · GEG — Spokane International</p>
 
@@ -126,6 +131,7 @@
   <div class="status" id="status"></div>
 </div>
 
+<script src="aeroboard-data.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -136,23 +142,26 @@
   $('radius').addEventListener('input', fmt);
   $('vis').addEventListener('input', fmt);
 
-  // load current settings
-  fetch('/api/settings').then(r=>r.json()).then(s=>{
+  // load current settings (from localStorage, via the client data layer)
+  {
+    const s = window.AeroData.loadSettings();
     $('lat').value = s.home_lat; $('lon').value = s.home_lon;
     $('label').value = s.location_label || '';
     $('radius').value = s.radius_nm; $('vis').value = s.visible_alt_ft; fmt();
     $('theme').value = s.theme || 'auto';
-  }).catch(()=>{});
+  }
 
-  // address search
+  // address search — OpenStreetMap Nominatim, called straight from the browser
   async function search(){
     const q = $('q').value.trim(); if(!q) return;
     const box = $('results'); box.innerHTML = '<button class="ghost" disabled>searching…</button>';
     try{
-      const r = await fetch('/api/geocode?q=' + encodeURIComponent(q));
-      const {results} = await r.json();
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(q);
+      const r = await fetch(url);
+      const raw = await r.json();
+      const results = (raw || []).map(x => ({ label: x.display_name, lat: +x.lat, lon: +x.lon }));
       box.innerHTML = '';
-      if(!results || !results.length){ box.innerHTML = '<button class="ghost" disabled>no matches</button>'; return; }
+      if(!results.length){ box.innerHTML = '<button class="ghost" disabled>no matches</button>'; return; }
       for(const res of results){
         const b = document.createElement('button');
         b.textContent = res.label;
@@ -180,8 +189,8 @@
 
   function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.className='status '+(err?'err':'ok'); }
 
-  // save
-  $('saveBtn').onclick = async () => {
+  // save (to localStorage, via the client data layer)
+  $('saveBtn').onclick = () => {
     const lat = num($('lat').value), lon = num($('lon').value);
     if(lat===null || lon===null){ setStatus('Enter a valid latitude and longitude', true); return; }
     const body = {
@@ -192,11 +201,13 @@
       theme: $('theme').value,
     };
     try{
-      const r = await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-      if(!r.ok) throw new Error((await r.json()).error || r.status);
+      window.AeroData.saveSettings(body);
       setStatus('Saved ✓  — the board will update on its next refresh.', false);
     }catch(e){ setStatus('Save failed: ' + e.message, true); }
   };
+
+  // Offline app shell (https / localhost only; a no-op elsewhere).
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 })();
 </script>
 </body>

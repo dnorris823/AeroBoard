@@ -77,7 +77,42 @@ Because the UI is a web page, moving from laptop to the finished board is just:
    ```
 3. That's the whole port. Same code, no rewrite. Touch works out of the box.
 
+## Running on an iPad (or any browser) — no server needed
+
+The board can also run with **no back end at all**: `web/aeroboard-data.js` is a
+browser port of the Python data layer that fetches everything straight from free,
+CORS-enabled public APIs, so the whole thing runs client-side on an iPad in kiosk
+mode.
+
+| Need | Source (called from the browser) |
+|---|---|
+| Flights | `api.airplanes.live` (ADS-B, no key) |
+| Routes (origin→dest) | `api.adsbdb.com` |
+| Weather | `api.weather.gov` — NWS KGEG observations (no key) |
+| Geocoding | `nominatim.openstreetmap.org` |
+| Settings | the browser's `localStorage` (was `settings.json`) |
+
+`web/sw.js` is a service worker that caches the app shell, so once installed the
+PWA opens and runs offline (only the live data needs the network). The Python
+server still works for local dev, but is now just an optional static file host —
+any static HTTPS host (e.g. GitHub Pages) serves the `web/` folder as-is.
+
+**Try it on the iPad, two ways:**
+
+1. *Quick, over your Wi-Fi:* run `python3 -m aeroboard.server`, then on the iPad
+   open Safari to `http://<your-computer-ip>:8000`, and **Share → Add to Home
+   Screen**. (Data is client-side, but the files come from your computer.)
+2. *No machine at all:* host the `web/` folder on any static HTTPS host, open it
+   in Safari on the iPad, **Add to Home Screen**. Nothing else runs anywhere.
+
+Lock it down with **Guided Access** (Settings → Accessibility) and set
+**Auto-Lock → Never**, and you have a kiosk.
+
+> Note: `adsb.lol` (the server's fallback flight source) and `aviationweather.gov`
+> (the server's METAR source) don't send CORS headers, so the browser build uses
+> `airplanes.live` for flights and NWS for weather instead.
+
 ## No dependencies
 
 The data layer and server use only the Python standard library. The UI is plain
-HTML/JS. Nothing to `pip install`.
+HTML/JS — no build step, no framework, nothing to `pip install` or `npm install`.

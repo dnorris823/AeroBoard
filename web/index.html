@@ -6,14 +6,14 @@
 <title>AeroBoard · GEG</title>
 
 <!-- PWA / iPad "Add to Home Screen": launches full-screen with no Safari chrome. -->
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#05070d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AeroBoard">
-<link rel="apple-touch-icon" href="/icon-180.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
@@ -32,7 +32,8 @@
 </head>
 <body>
 <canvas id="screen"></canvas>
-<script src="/aeroboard-engine.js"></script>
+<script src="aeroboard-engine.js"></script>
+<script src="aeroboard-data.js"></script>
 <script>
 (() => {
   const cv = document.getElementById('screen');
@@ -41,17 +42,14 @@
   function boot(theme) {
     const app = window.AeroBoard.mount(cv, theme || 'auto', {
       timeZone: TZ,
-      onSettings: () => { location.href = '/settings'; },
+      onSettings: () => { location.href = 'settings.html'; },
     });
 
-    // Live data: poll the local server; fall back to the built-in sample if it's
-    // unreachable so the board still renders.
+    // Live data: fetch everything client-side (no server). If a fetch fails we
+    // keep the last snapshot / built-in sample so the board still renders.
     async function poll() {
       try {
-        const r = await fetch('/api/flights', { cache: 'no-store' });
-        if (!r.ok) throw new Error(r.status);
-        const d = await r.json();
-        d.live = true;
+        const d = await window.AeroData.getSnapshot();
         app.setData(d);
       } catch (e) { /* keep last snapshot / the sample */ }
     }
@@ -59,16 +57,19 @@
     setInterval(poll, 10000);
   }
 
-  // Read the saved look, then start. Default to the auto time-of-day theme.
+  // Read the saved look (localStorage), then start. Default to auto time-of-day.
   function start() {
-    fetch('/api/settings', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(s => boot(s.theme || 'auto'))
-      .catch(() => boot('auto'));
+    const s = window.AeroData.loadSettings();
+    boot(s.theme || 'auto');
   }
 
   if (window.AeroBoard) start();
   else addEventListener('load', start);
+
+  // Offline app shell (works only over https / localhost — a no-op elsewhere).
+  if ('serviceWorker' in navigator) {
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
 })();
 </script>
 </body>
