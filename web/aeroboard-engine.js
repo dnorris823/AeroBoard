@@ -191,10 +191,18 @@
 
     // UI logical space is always 384x216; the canvas may be larger (finer pixels).
     const W = 384, H = 216;
+    // Device supersample: paint the whole board onto a backing store RES× denser
+    // than the native pixel grid, so text, radar rings, gradients and every
+    // diagonal/curve rasterize at RES× the detail. The rect-based pixel art keeps
+    // its on-screen block size (still pixely) — this only sharpens, never reflows.
+    // The CSS on #screen upscales the canvas to fill the panel; a denser backing
+    // store means that upscale magnifies far less, killing the chunky look.
+    // RES 3 lands near-native on a retina iPad (DPR 2) for the crispest text/curves.
+    const RES = 3;
     let CW = theme.W || 384, CH = theme.H || 216;
     let uiScale = CW / W;
     const ctx = canvas.getContext('2d');
-    canvas.width = CW; canvas.height = CH;
+    canvas.width = CW * RES; canvas.height = CH * RES;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     // swap the active theme in place (palette + scene); resize the canvas if the
@@ -202,7 +210,7 @@
     function applyTheme(id) {
       curId = id; theme = THEMES[id]; C = theme.C; TAG = TAGMAP(C); FS = theme.fontSize || 0;
       const nCW = theme.W || 384, nCH = theme.H || 216;
-      if (nCW !== CW || nCH !== CH) { CW = nCW; CH = nCH; canvas.width = CW; canvas.height = CH; uiScale = CW / W; }
+      if (nCW !== CW || nCH !== CH) { CW = nCW; CH = nCH; canvas.width = CW * RES; canvas.height = CH * RES; uiScale = CW / W; }
     }
 
     let data = opts.data || SAMPLE;
@@ -895,7 +903,10 @@
 
     function draw() {
       hits = [];
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // Base transform carries the RES supersample: scene art + post-fx are authored
+      // in native CW×CH space, the UI in 384×216 (scaled by uiScale on top). Every
+      // draw call below therefore lands on the RES-denser backing store unchanged.
+      ctx.setTransform(RES, 0, 0, RES, 0, 0);
       ctx.fillStyle = C.bg; ctx.fillRect(0, 0, CW, CH);
       if (theme.fullScene) drawFullScene();
       ctx.save();
@@ -905,7 +916,7 @@
       else if (view === 'settings') drawSettings(data);
       else drawBoard(data);
       ctx.restore();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.setTransform(RES, 0, 0, RES, 0, 0);
       postFx();
     }
     let autoCheck = 0;
