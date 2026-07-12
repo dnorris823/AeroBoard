@@ -58,6 +58,13 @@
   .status.ok{color:var(--green);} .status.err{color:var(--red);}
   .buildrow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
   .buildrow .readout{font-size:15px;}
+  .changelog{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;}
+  .changelog h2{color:var(--dim);font-size:11px;letter-spacing:.2em;text-transform:uppercase;margin:0 0 12px;font-weight:700;}
+  .changelog ul{list-style:none;margin:0;padding:0;}
+  .changelog li{display:flex;gap:12px;padding:7px 0;border-top:1px solid var(--panel2);}
+  .changelog li:first-child{border-top:none;}
+  .changelog .cl-ver{color:var(--amber);font-weight:700;flex:0 0 auto;min-width:34px;}
+  .changelog .cl-desc{color:var(--dim);line-height:1.5;font-size:13px;}
 </style>
 </head>
 <body>
@@ -144,6 +151,25 @@
     <p class="hint">This is the build currently cached on <em>this</em> device. Tap “Check for
       updates” to pull the latest from the network and reload — handy on the iPad after a new
       release.</p>
+
+    <div class="changelog">
+      <h2>Changelog</h2>
+      <ul>
+        <li><span class="cl-ver">v13</span><span class="cl-desc">Added this changelog to the settings page.</span></li>
+        <li><span class="cl-ver">v12</span><span class="cl-desc">Airline identity on flight detail — carrier name, brand color and code.</span></li>
+        <li><span class="cl-ver">v11</span><span class="cl-desc">Routes are validated against the live aircraft position for better accuracy.</span></li>
+        <li><span class="cl-ver">v10</span><span class="cl-desc">The location label auto-fills from the coordinates you enter.</span></li>
+        <li><span class="cl-ver">v9</span><span class="cl-desc">Live “local time there” preview added to settings.</span></li>
+        <li><span class="cl-ver">v8</span><span class="cl-desc">The board shows the local time of its location instead of the device’s time.</span></li>
+        <li><span class="cl-ver">v7</span><span class="cl-desc">Location-agnostic board — every data feed follows your home lat/lon.</span></li>
+        <li><span class="cl-ver">v6</span><span class="cl-desc">Auto theme tracks the real sun, blending time-of-day scenes by sunrise and sunset.</span></li>
+        <li><span class="cl-ver">v5</span><span class="cl-desc">Self-hosted pixel fonts so the board stays crisp on iPad.</span></li>
+        <li><span class="cl-ver">v4</span><span class="cl-desc">Sharper 3× board engine shipped to installed PWAs.</span></li>
+        <li><span class="cl-ver">v3</span><span class="cl-desc">Build version and a one-tap “Check for updates” added to settings.</span></li>
+        <li><span class="cl-ver">v2</span><span class="cl-desc">UI polish and fixes.</span></li>
+        <li><span class="cl-ver">v1</span><span class="cl-desc">First fully client-side build — runs on an iPad with no server.</span></li>
+      </ul>
+    </div>
   </fieldset>
 </div>
 
