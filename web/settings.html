@@ -83,7 +83,8 @@
     <label class="f">Location label</label>
     <input type="text" id="label" maxlength="48" placeholder="Home">
     <p class="hint">Distances and the “look” direction are measured from here. Enter an
-      address to auto-fill the coordinates, or drop them in by hand.</p>
+      address to auto-fill the coordinates, or drop them in by hand — the label fills
+      itself in from the coordinates unless you type your own.</p>
     <p class="hint" id="tzLine">Local time there: <span class="readout" id="tzClock">—</span>
       <span id="tzZone"></span></p>
   </fieldset>
@@ -195,10 +196,31 @@
       curTz = null; $('tzZone').textContent = '(zone unavailable)'; renderTzClock();
     });
   }
+  // ---- auto location label from coordinates --------------------------------
+  // Same idea as the clock: the label should follow the pin. We only fill it
+  // when we "own" the current value (it was blank, or we auto-filled it last
+  // time) so a label the user typed by hand is never clobbered. A request token
+  // guards against a slow reverse-geocode landing after the coords moved again.
+  let labelAuto = false, labelReq = 0, labelDebounce = 0;
+  function refreshLabel(force){
+    const lat = num($('lat').value), lon = num($('lon').value);
+    if(lat === null || lon === null) return;
+    if(!force && !labelAuto && $('label').value.trim()) return;  // respect a manual label
+    const token = ++labelReq;
+    window.AeroData.getPlaceLabel(lat, lon).then(name => {
+      if(token !== labelReq || !name) return;      // coords changed, or lookup failed
+      $('label').value = name;
+      labelAuto = true;                            // we own it — keep it in sync
+    }).catch(() => {});
+  }
+
   // Debounce manual coord typing; fire immediately for programmatic changes.
   function scheduleTz(){ clearTimeout(tzDebounce); tzDebounce = setTimeout(refreshTz, 400); }
-  $('lat').addEventListener('input', scheduleTz);
-  $('lon').addEventListener('input', scheduleTz);
+  function scheduleLabel(){ clearTimeout(labelDebounce); labelDebounce = setTimeout(refreshLabel, 500); }
+  $('lat').addEventListener('input', () => { scheduleTz(); scheduleLabel(); });
+  $('lon').addEventListener('input', () => { scheduleTz(); scheduleLabel(); });
+  // Typing in the label field hands ownership back to the user.
+  $('label').addEventListener('input', () => { labelAuto = false; });
   setInterval(renderTzClock, 1000);
 
   // load current settings (from localStorage, via the client data layer)
@@ -210,6 +232,7 @@
     $('theme').value = s.theme || 'auto';
   }
   refreshTz();
+  refreshLabel();   // fill in a label if this location doesn't have one yet
 
   // address search — OpenStreetMap Nominatim, called straight from the browser
   async function search(){
@@ -228,7 +251,8 @@
         b.onclick = () => {
           $('lat').value = res.lat.toFixed(4);
           $('lon').value = res.lon.toFixed(4);
-          if(!$('label').value) $('label').value = res.label.split(',')[0];
+          $('label').value = res.label.split(',')[0];
+          labelAuto = true;                 // picked from search — keep it in sync with the pin
           box.innerHTML = '';
           refreshTz();
         };
@@ -243,7 +267,7 @@
   $('geoBtn').onclick = () => {
     if(!navigator.geolocation){ setStatus('Geolocation not available here', true); return; }
     navigator.geolocation.getCurrentPosition(
-      p => { $('lat').value = p.coords.latitude.toFixed(4); $('lon').value = p.coords.longitude.toFixed(4); refreshTz(); },
+      p => { $('lat').value = p.coords.latitude.toFixed(4); $('lon').value = p.coords.longitude.toFixed(4); refreshTz(); refreshLabel(true); },
       () => setStatus('Could not get device location', true)
     );
   };

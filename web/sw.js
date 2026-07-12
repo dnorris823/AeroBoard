@@ -1,7 +1,7 @@
 /* AeroBoard service worker — caches the app shell so the installed PWA opens
  * and runs without any server. Live data still comes from the network (the
  * public flight/route/weather APIs); only the static files are cached. */
-var CACHE = 'aeroboard-v9';
+var CACHE = 'aeroboard-v10';
 var SHELL = [
   './', 'index.html', 'settings.html',
   'aeroboard-engine.js', 'aeroboard-data.js', 'manifest.webmanifest',
