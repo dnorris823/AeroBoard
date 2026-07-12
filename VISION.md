@@ -58,7 +58,7 @@ and season. Glance over, and the sky over our home comes to life.
   (airplanes.live → adsb.lol fallback), normalized, geo-tagged (distance/bearing from
   home), classified APPROACH / DEPARTURE / GA / OVERFLIGHT. Standard library only.
 - **Routes + Settings:** `routes.py` adds origin→dest per airline callsign (adsbdb,
-  cached); `settings.py` persists user location/radius/ceiling to `settings.json`.
+  cached); `settings.py` persists user location/radius to `settings.json`.
 - **UI (`web/`):** four tap-navigated views — **board**, **flight detail** (with a
   "look" compass pointing where to spot it), **fullscreen radar + stats**, and a
   **settings form** (address lookup / device location / manual coords). Touch handled
@@ -125,7 +125,8 @@ and season. Glance over, and the sky over our home comes to life.
 - **Touch to inspect:** ✅ BUILT — tap a flight → detail view (route, altitude/speed,
   heading, squawk, "look" compass); tap the radar → fullscreen radar + stats.
 - **Settings page:** ✅ BUILT — location (address lookup / device / manual coords),
-  search radius, visibility ceiling.
+  search radius. The flight list also has an on-board sort/filter pop-over
+  (distance/altitude, category, airborne-only) and scrolls (drag / wheel / arrows).
 - **Daily counter:** "planes spotted today: 42"; monthly "wrapped" summary from a log.
 
 ### Nice-to-have (later)
@@ -158,7 +159,7 @@ and season. Glance over, and the sky over our home comes to life.
 - **Data:** free ADS-B API (airplanes.live → adsb.lol); routes via **adsbdb**; geocode
   via **Nominatim**. No local receiver v1. METAR/weather still to come.
 - **Built:** board + flight-detail + fullscreen-radar-with-stats + settings views;
-  route enrichment; runtime settings (location/radius/ceiling) → settings.json.
+  route enrichment; runtime settings (location/radius) → settings.json.
 - **~Superseded:** FlightWall / LED-matrix + Adafruit bonnet (pivoted to screen);
   Stardew wood-cottage skin (pivoted to airport/ATC look); Pygame renderer (swapped
   for a browser canvas so laptop-dev and the device run the exact same UI).

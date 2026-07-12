@@ -12,9 +12,10 @@ HOME_LON = GEG_LON
 # How far out to pull traffic, in nautical miles (airplanes.live caps at 250).
 RADIUS_NM = 40
 
-# Altitude (ft) at/below which an aircraft is plausibly *visible* from the ground —
-# used to sort the planes you can actually see to the top.
-VISIBLE_ALT_FT = 10000
+# Altitude (ft) at/below which climb/descent reads as an approach/departure and
+# light traffic reads as general aviation. Purely a classification band — not a
+# user-facing setting.
+LOW_ALT_FT = 10000
 
 # Above this it's a high overflight we de-emphasize.
 OVERFLIGHT_ALT_FT = 18000

@@ -57,7 +57,6 @@ def _flight_dict(ac) -> dict:
         "bearing": round(ac.bearing, 1),
         "compass": compass(ac.bearing) if ac.distance_nm else "",
         "tag": ac.tag,
-        "visible": ac.visible,
     }
 
 

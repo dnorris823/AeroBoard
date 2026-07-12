@@ -100,10 +100,8 @@
     <legend>Traffic</legend>
     <label class="f">Search radius — <span class="readout" id="radiusOut">40</span> nm</label>
     <input type="range" id="radius" min="5" max="150" step="5" value="40">
-    <label class="f">“Visible” altitude ceiling — <span class="readout" id="visOut">10,000</span> ft</label>
-    <input type="range" id="vis" min="1000" max="20000" step="500" value="10000">
-    <p class="hint">Planes at or below the ceiling are treated as spottable and sorted to
-      the top of the board.</p>
+    <p class="hint">How far out to pull traffic. Sort and filter the board itself with
+      the ⚙ controls on the flight list.</p>
   </fieldset>
 
   <fieldset>
@@ -180,10 +178,8 @@
   const $ = id => document.getElementById(id);
   const num = v => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
 
-  function fmt(){ $('radiusOut').textContent = $('radius').value;
-                 $('visOut').textContent = (+$('vis').value).toLocaleString(); }
+  function fmt(){ $('radiusOut').textContent = $('radius').value; }
   $('radius').addEventListener('input', fmt);
-  $('vis').addEventListener('input', fmt);
 
   // ---- live "local time there" preview -------------------------------------
   // Mirrors what the board will show: resolve the IANA zone for the entered
@@ -255,7 +251,7 @@
     const s = window.AeroData.loadSettings();
     $('lat').value = s.home_lat; $('lon').value = s.home_lon;
     $('label').value = s.location_label || '';
-    $('radius').value = s.radius_nm; $('vis').value = s.visible_alt_ft; fmt();
+    $('radius').value = s.radius_nm; fmt();
     $('theme').value = s.theme || 'auto';
   }
   refreshTz();
@@ -309,7 +305,6 @@
       home_lat: lat, home_lon: lon,
       location_label: $('label').value.trim() || 'Home',
       radius_nm: parseInt($('radius').value, 10),
-      visible_alt_ft: parseInt($('vis').value, 10),
       theme: $('theme').value,
     };
     try{

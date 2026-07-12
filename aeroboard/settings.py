@@ -21,7 +21,6 @@ DEFAULTS = {
     "home_lon": config.HOME_LON,
     "location_label": "GEG (airport)",
     "radius_nm": config.RADIUS_NM,
-    "visible_alt_ft": config.VISIBLE_ALT_FT,
     "theme": "auto",
 }
 
@@ -64,7 +63,6 @@ def _coerce(patch: dict) -> dict:
     num("home_lat", -90.0, 90.0, float)
     num("home_lon", -180.0, 180.0, float)
     num("radius_nm", 1, 250, int)
-    num("visible_alt_ft", 500, 45000, int)
     if "location_label" in patch and patch["location_label"] is not None:
         out["location_label"] = str(patch["location_label"])[:48]
     if patch.get("theme") in THEMES:

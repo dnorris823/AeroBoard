@@ -32,12 +32,12 @@
     location_label: 'GEG · Spokane Intl',
     counts: { APPROACH: 2, DEPARTURE: 1, GA: 2, OVERFLIGHT: 1 },
     flights: [
-      { hex: 'a1b2c3', label: 'SKW5612', reg: 'N612SY', type: 'E75L', alt_ft: 2900, on_ground: false, gs_kt: 139, track: 210, vrate_fpm: -640, squawk: '4571', origin: 'SEA', dest: 'GEG', origin_city: 'Seattle', dest_city: 'Spokane', airline_name: 'SkyWest Airlines', airline_iata: 'OO', airline_icao: 'SKW', airline_country: 'US', distance_nm: 2.9, bearing: 41, compass: 'NE', tag: 'APPROACH', visible: true },
-      { hex: 'a2c4e6', label: 'DAL1853', reg: 'N301DN', type: 'A320', alt_ft: 5400, on_ground: false, gs_kt: 216, track: 225, vrate_fpm: -900, squawk: '3422', origin: 'SLC', dest: 'GEG', origin_city: 'Salt Lake City', dest_city: 'Spokane', airline_name: 'Delta Air Lines', airline_iata: 'DL', airline_icao: 'DAL', airline_country: 'US', distance_nm: 11.1, bearing: 47, compass: 'NE', tag: 'APPROACH', visible: true },
-      { hex: 'b3d5f7', label: 'N7908L', reg: 'N7908L', type: 'BE23', alt_ft: 3275, on_ground: false, gs_kt: 96, track: 90, vrate_fpm: 520, squawk: '1200', origin: null, dest: null, distance_nm: 0.9, bearing: 135, compass: 'SE', tag: 'DEPARTURE', visible: true },
-      { hex: 'c4e6a8', label: 'N738BS', reg: 'N738BS', type: 'C172', alt_ft: 3300, on_ground: false, gs_kt: 103, track: 20, vrate_fpm: 0, squawk: '1200', origin: null, dest: null, distance_nm: 6.2, bearing: 20, compass: 'NNE', tag: 'GA', visible: true },
-      { hex: 'e0a1b2', label: 'N512CP', reg: 'N512CP', type: 'PA28', alt_ft: 4100, on_ground: false, gs_kt: 88, track: 160, vrate_fpm: 200, squawk: '1200', origin: null, dest: null, distance_nm: 9.4, bearing: 300, compass: 'NW', tag: 'GA', visible: false },
-      { hex: 'd5f7b9', label: 'ACA109', reg: 'C-GHQY', type: 'A321', alt_ft: 34000, on_ground: false, gs_kt: 358, track: 300, vrate_fpm: 0, squawk: '2701', origin: 'YVR', dest: 'SFO', origin_city: 'Vancouver', dest_city: 'San Francisco', airline_name: 'Air Canada', airline_iata: 'AC', airline_icao: 'ACA', airline_country: 'CA', distance_nm: 22, bearing: 300, compass: 'NW', tag: 'OVERFLIGHT', visible: false },
+      { hex: 'a1b2c3', label: 'SKW5612', reg: 'N612SY', type: 'E75L', alt_ft: 2900, on_ground: false, gs_kt: 139, track: 210, vrate_fpm: -640, squawk: '4571', origin: 'SEA', dest: 'GEG', origin_city: 'Seattle', dest_city: 'Spokane', airline_name: 'SkyWest Airlines', airline_iata: 'OO', airline_icao: 'SKW', airline_country: 'US', distance_nm: 2.9, bearing: 41, compass: 'NE', tag: 'APPROACH' },
+      { hex: 'a2c4e6', label: 'DAL1853', reg: 'N301DN', type: 'A320', alt_ft: 5400, on_ground: false, gs_kt: 216, track: 225, vrate_fpm: -900, squawk: '3422', origin: 'SLC', dest: 'GEG', origin_city: 'Salt Lake City', dest_city: 'Spokane', airline_name: 'Delta Air Lines', airline_iata: 'DL', airline_icao: 'DAL', airline_country: 'US', distance_nm: 11.1, bearing: 47, compass: 'NE', tag: 'APPROACH' },
+      { hex: 'b3d5f7', label: 'N7908L', reg: 'N7908L', type: 'BE23', alt_ft: 3275, on_ground: false, gs_kt: 96, track: 90, vrate_fpm: 520, squawk: '1200', origin: null, dest: null, distance_nm: 0.9, bearing: 135, compass: 'SE', tag: 'DEPARTURE' },
+      { hex: 'c4e6a8', label: 'N738BS', reg: 'N738BS', type: 'C172', alt_ft: 3300, on_ground: false, gs_kt: 103, track: 20, vrate_fpm: 0, squawk: '1200', origin: null, dest: null, distance_nm: 6.2, bearing: 20, compass: 'NNE', tag: 'GA' },
+      { hex: 'e0a1b2', label: 'N512CP', reg: 'N512CP', type: 'PA28', alt_ft: 4100, on_ground: false, gs_kt: 88, track: 160, vrate_fpm: 200, squawk: '1200', origin: null, dest: null, distance_nm: 9.4, bearing: 300, compass: 'NW', tag: 'GA' },
+      { hex: 'd5f7b9', label: 'ACA109', reg: 'C-GHQY', type: 'A321', alt_ft: 34000, on_ground: false, gs_kt: 358, track: 300, vrate_fpm: 0, squawk: '2701', origin: 'YVR', dest: 'SFO', origin_city: 'Vancouver', dest_city: 'San Francisco', airline_name: 'Air Canada', airline_iata: 'AC', airline_icao: 'ACA', airline_country: 'CA', distance_nm: 22, bearing: 300, compass: 'NW', tag: 'OVERFLIGHT' },
     ],
   };
 
@@ -232,9 +232,12 @@
   };
 
   const TAGMAP = (C) => ({
-    APPROACH: C.amber, DEPARTURE: C.blue, LOW: C.green, GA: C.green,
+    APPROACH: C.amber, DEPARTURE: C.blue, GA: C.green,
     OVERFLIGHT: C.faint, TRANSIT: C.dim, GROUND: C.faint,
   });
+  // Low, near-the-field traffic — the planes you can plausibly spot from the
+  // ground. Emphasized on the radar (was the old "visible" flag).
+  const NEAR_TAGS = { APPROACH: 1, DEPARTURE: 1, GA: 1 };
 
   function hexA(hex, a) {
     if (hex[0] !== '#') return hex;
@@ -426,6 +429,38 @@
     let sweep = 0, beacon = 0, t = 0, lastT = performance.now();
     let hits = [];
 
+    // ---- flight-list scroll + sort/filter state (board view) ----
+    // The main list can hold more flights than fit on screen, so it scrolls
+    // (drag / wheel / arrow buttons). A pop-over lets you re-sort and filter it.
+    let listScrollY = 0;          // px scrolled down within the list viewport
+    let scrollMax = 0;            // max scroll for the current list (0 = no scroll)
+    let listBox = null;           // { x, y, w, h } of the scroll viewport, for drag/wheel
+    let filterOpen = false;       // is the sort/filter pop-over showing
+    const ALL_TAGS = ['APPROACH', 'DEPARTURE', 'GA', 'OVERFLIGHT', 'TRANSIT', 'GROUND'];
+    const sortState = { key: 'distance', dir: 1 };   // key: distance|altitude, dir: 1 asc / -1 desc
+    const filterState = { tags: {}, airborneOnly: false };
+    ALL_TAGS.forEach(tg => { filterState.tags[tg] = true; });
+    // Apply the current filter + sort to a flight list (returns a new array).
+    function applyView(flights) {
+      const out = flights.filter(ac =>
+        filterState.tags[ac.tag] !== false && (!filterState.airborneOnly || !ac.on_ground));
+      const dir = sortState.dir;
+      out.sort((a, b) => {
+        let av, bv;
+        if (sortState.key === 'altitude') {
+          av = a.alt_ft == null ? -Infinity : a.alt_ft;
+          bv = b.alt_ft == null ? -Infinity : b.alt_ft;
+        } else {
+          av = a.distance_nm == null ? Infinity : a.distance_nm;
+          bv = b.distance_nm == null ? Infinity : b.distance_nm;
+        }
+        return av === bv ? 0 : (av < bv ? -1 : 1) * dir;
+      });
+      return out;
+    }
+    const filtersActive = () =>
+      filterState.airborneOnly || ALL_TAGS.some(tg => filterState.tags[tg] === false);
+
     const findFlight = (hex) => data.flights.find(f => f.hex === hex);
     const addHit = (x, y, w, h, fn) => hits.push({ x, y, w, h, fn });
 
@@ -585,9 +620,10 @@
         if (!ac.distance_nm) continue;
         const rp = Math.min(1, ac.distance_nm / d.radius_nm) * R, a = ac.bearing * Math.PI / 180;
         const px = cx + rp * Math.sin(a), py = cy - rp * Math.cos(a);
-        const s = ac.visible ? (big ? 3 : 2) : (big ? 2 : 1);
+        const near = !!NEAR_TAGS[ac.tag];
+        const s = near ? (big ? 3 : 2) : (big ? 2 : 1);
         const col = TAG[ac.tag] || C.dim;
-        if (ac.visible) { ctx.shadowColor = col; ctx.shadowBlur = 5; }
+        if (near) { ctx.shadowColor = col; ctx.shadowBlur = 5; }
         rect(Math.round(px) - s / 2, Math.round(py) - s / 2, s, s, col);
         ctx.shadowBlur = 0;
         if (big) addHit(px - 6, py - 6, 12, 12, () => { selectedHex = ac.hex; view = 'detail'; });
@@ -929,16 +965,46 @@
       const hb = wxOn ? 29 : 16;
 
       const sceneH = hasBand ? 40 : 0;
-      const top = hb + 2, rowH = 25, listX = 3, listW = 248;
+      const rowH = 25, listX = 3, listW = 248, tbH = 11;
+      const top = hb + 2;
+      const listTop = top + tbH;                        // rows begin below the toolbar
       const listBottom = H - (hasBand ? sceneH + 2 : 14);
-      const maxRows = Math.floor((listBottom - top) / rowH);
+      const visibleH = listBottom - listTop;
+      const maxRows = Math.max(1, Math.floor(visibleH / rowH));
       if (theme.id === 'poster') rect(0, hb, 252, listBottom - hb, C.panel);
       else if (theme.glass) rect(0, hb, 253, listBottom - hb, C.glassList);
-      if (!d.flights.length && !d.error) text('quiet skies overhead', listX + 8, top + 20, C.dim, 12);
-      d.flights.slice(0, maxRows).forEach((ac, i) => {
-        const y = top + i * rowH;
+
+      // Filter + sort just the list (the radar/counts still reflect every flight).
+      const viewFlights = applyView(d.flights);
+      const contentH = viewFlights.length * rowH;
+      scrollMax = Math.max(0, contentH - visibleH);
+      listScrollY = Math.max(0, Math.min(scrollMax, listScrollY));
+      listBox = { x: listX, y: listTop, w: listW, h: visibleH };
+
+      // ---- toolbar: shows the active sort, opens the sort/filter pop-over, and
+      //      carries the page up/down arrows for the scroll.
+      const active = filtersActive();
+      const sortLbl = (sortState.key === 'altitude' ? 'ALT' : 'DIST') + (sortState.dir > 0 ? ' ↑' : ' ↓');
+      text('SORT ' + sortLbl, listX + 4, top + 1, C.ink, 9, { bold: true });
+      text(active ? 'FILTER •' : 'FILTER', listX + 78, top + 1, active ? C.amber : C.dim, 9, { bold: active });
+      addHit(listX, top - 1, listW - 34, tbH, () => { filterOpen = true; });
+      const canUp = scrollMax > 0 && listScrollY > 0, canDn = scrollMax > 0 && listScrollY < scrollMax;
+      const pageStep = Math.max(rowH, (maxRows - 1) * rowH);
+      vtri(listX + listW - 26, top + 2, canUp ? C.ink : C.faint, true);
+      vtri(listX + listW - 11, top + 2, canDn ? C.ink : C.faint, false);
+      addHit(listX + listW - 32, top - 1, 15, tbH + 1, () => { listScrollY = Math.max(0, listScrollY - pageStep); });
+      addHit(listX + listW - 16, top - 1, 16, tbH + 1, () => { listScrollY = Math.min(scrollMax, listScrollY + pageStep); });
+      rect(listX, listTop - 1, listW, 1, C.line);
+
+      // ---- empty states
+      if (!viewFlights.length) {
+        const msg = !d.flights.length ? (d.error ? '' : 'quiet skies overhead') : 'no flights match the filter';
+        if (msg) text(msg, listX + 8, listTop + 16, C.dim, 12);
+      }
+
+      // ---- rows, clipped to the viewport and offset by the scroll position
+      const drawRow = (ac, y) => {
         const col = TAG[ac.tag] || C.dim;
-        if (ac.visible) rect(listX, y, listW, rowH - 2, C.panelHi);
         rect(listX, y, 2, rowH - 2, col);
         if (theme.flap === 'full') flapRow(ac.label, listX + 7, y + 1, 8, 9, C.ink);
         else text(ac.label, listX + 7, y + 1, C.ink, 12, { bold: true });
@@ -955,8 +1021,27 @@
         text(ac.distance_nm + 'NM', listX + 128, ly, C.dim, 10);
         text(ac.compass, listX + 186, ly, C.ink, 10);
         if (ac.compass) bearingTri(listX + 212, ly + 5, ac.bearing, 4, col);
-        addHit(listX, y, listW, rowH - 2, () => { selectedHex = ac.hex; view = 'detail'; });
-      });
+      };
+      ctx.save();
+      ctx.beginPath(); ctx.rect(listX, listTop, listW + 6, visibleH); ctx.clip();
+      const first = Math.max(0, Math.floor(listScrollY / rowH));
+      const last = Math.min(viewFlights.length, Math.ceil((listScrollY + visibleH) / rowH));
+      for (let i = first; i < last; i++) {
+        const ac = viewFlights[i];
+        const y = listTop + i * rowH - listScrollY;
+        drawRow(ac, y);
+        const hy = Math.max(listTop, y), hh = Math.min(y + rowH - 2, listBottom) - hy;
+        if (hh > 3) addHit(listX, hy, listW, hh, () => { selectedHex = ac.hex; view = 'detail'; });
+      }
+      ctx.restore();
+
+      // ---- scroll thumb, in the gutter between the list and the radar
+      if (scrollMax > 0) {
+        const thumbH = Math.max(8, visibleH * visibleH / contentH);
+        const thumbY = listTop + (listScrollY / scrollMax) * (visibleH - thumbH);
+        rect(listX + listW + 1, listTop, 2, visibleH, C.line);
+        rect(listX + listW + 1, thumbY, 2, thumbH, C.amber);
+      }
 
       // The weather ribbon pushes the radar down by 13px (ry 18 -> 31); shrink the
       // radar by the same amount so its bottom edge — and everything stacked under
@@ -972,7 +1057,7 @@
       if (theme.glass) rect(sx - 3, sy - 3, rw + 3, H - sy - 13, C.glassList);
       text('IN RANGE', sx, sy, C.dim, 9);
       let cyy = sy + 11;
-      for (const tag of ['APPROACH', 'DEPARTURE', 'LOW', 'GA', 'OVERFLIGHT']) {
+      for (const tag of ['APPROACH', 'DEPARTURE', 'GA', 'OVERFLIGHT']) {
         const n = (d.counts || {})[tag]; if (!n) continue;
         const c = TAG[tag] || C.dim; rect(sx, cyy + 1, 5, 5, c);
         text(tag.slice(0, 4), sx + 9, cyy, C.dim, 9);
@@ -982,6 +1067,73 @@
 
       if (hasBand) drawScene(0, H - sceneH, W, sceneH);
       else footer(d);
+
+      if (filterOpen) drawFilterPanel();   // modal — drawn last, hits registered last
+    }
+
+    // ---- sort & filter pop-over (board view) ----
+    // A tap-driven modal over the board. Options mutate sortState/filterState in
+    // place; the list re-derives from them on the next frame. Hits are added after
+    // everything else so they win the pointer scan (which runs newest-first).
+    function drawFilterPanel() {
+      // dim the board behind the panel, then a full-screen backdrop hit to dismiss
+      ctx.fillStyle = hexA(C.bg, .82); ctx.fillRect(0, 0, W, H);
+      addHit(0, 0, W, H, () => { filterOpen = false; });
+
+      const px = 8, pw = W - 16, py = 14, ph = H - 28;
+      rect(px, py, pw, ph, C.panel); stroke(px, py, pw, ph, C.line);
+      text('SORT & FILTER', px + pw / 2, py + 5, C.ink, 12, { bold: true, center: true });
+      text('✕', px + pw - 9, py + 4, C.dim, 11, { center: true });
+      addHit(px + pw - 20, py, 20, 16, () => { filterOpen = false; });
+      rect(px + 6, py + 19, pw - 12, 1, C.line);
+
+      // helper: a tappable row with a left marker (check box / sort dot) + label
+      const optRow = (x, y, w, on, label, mark, onTap) => {
+        rect(x, y, w, 13, on ? C.panelHi : C.inner); stroke(x, y, w, 13, C.line);
+        if (mark) mark(x + 4, y + 2);
+        else { stroke(x + 4, y + 3, 7, 7, on ? C.green : C.line); if (on) { rect(x + 6, y + 5, 3, 3, C.green); } }
+        text(label, x + 15, y + 2, on ? C.ink : C.dim, 10, { bold: on });
+        addHit(x, y, w, 13, onTap);
+      };
+
+      // -- left column: SORT + options --
+      const colW = (pw - 18) / 2;
+      const lx = px + 6; let ly = py + 26;
+      text('SORT BY', lx, ly, C.dim, 9); ly += 12;
+      [['distance', 'DISTANCE'], ['altitude', 'ALTITUDE']].forEach(([key, name]) => {
+        const on = sortState.key === key;
+        optRow(lx, ly, colW, on, name + (on ? (sortState.dir > 0 ? '  ↑ up' : '  ↓ down') : ''),
+          (mx, my) => vtri(mx + 1, my + 1, on ? C.amber : C.line, on ? sortState.dir > 0 : true),
+          () => { if (sortState.key === key) sortState.dir *= -1; else sortState.key = key; });
+        ly += 16;
+      });
+      ly += 6;
+      text('OPTIONS', lx, ly, C.dim, 9); ly += 12;
+      optRow(lx, ly, colW, filterState.airborneOnly, 'AIRBORNE ONLY', null,
+        () => { filterState.airborneOnly = !filterState.airborneOnly; });
+
+      // -- right column: category filters --
+      const rxx = px + 6 + colW + 6; let ry2 = py + 26;
+      text('SHOW CATEGORIES', rxx, ry2, C.dim, 9); ry2 += 12;
+      ALL_TAGS.forEach(tg => {
+        const on = filterState.tags[tg] !== false, c = TAG[tg] || C.dim;
+        optRow(rxx, ry2, colW, on, tg,
+          (mx, my) => { stroke(mx, my + 1, 7, 7, on ? c : C.line); if (on) rect(mx + 2, my + 3, 3, 3, c); },
+          () => { filterState.tags[tg] = !on; });
+        ry2 += 16;
+      });
+
+      // -- footer: reset / done --
+      const by = py + ph - 20;
+      rect(px + 6, by, 70, 14, C.inner); stroke(px + 6, by, 70, 14, C.line);
+      text('RESET', px + 6 + 35, by + 2, C.dim, 10, { center: true, bold: true });
+      addHit(px + 6, by, 70, 14, () => {
+        sortState.key = 'distance'; sortState.dir = 1;
+        filterState.airborneOnly = false; ALL_TAGS.forEach(tg => { filterState.tags[tg] = true; });
+      });
+      rect(px + pw - 76, by, 70, 14, C.amber);
+      text('DONE', px + pw - 76 + 35, by + 2, theme.glass ? '#0a1420' : C.bg, 10, { center: true, bold: true });
+      addHit(px + pw - 76, by, 70, 14, () => { filterOpen = false; });
     }
 
     // ============================ DETAIL ============================
@@ -1059,7 +1211,7 @@
         closest: min(air.filter(f => f.distance_nm != null), 'distance_nm'),
         lowest: min(air.filter(f => f.alt_ft != null), 'alt_ft'),
         fastest: max(air.filter(f => f.gs_kt != null), 'gs_kt'),
-        visible: d.flights.filter(f => f.visible).length,
+        near: d.flights.filter(f => NEAR_TAGS[f.tag]).length,
       };
     }
     function drawRadarView(d) {
@@ -1074,7 +1226,7 @@
       rect(sx, sy, pw, H - sy - 8, C.inner); stroke(sx, sy, pw, H - sy - 8, C.line);
       const ix = sx + 7; let iy = sy + 7;
       text('IN RANGE', ix, iy, C.dim, 9); iy += 13;
-      for (const tag of ['APPROACH', 'DEPARTURE', 'LOW', 'GA', 'OVERFLIGHT', 'GROUND']) {
+      for (const tag of ['APPROACH', 'DEPARTURE', 'GA', 'OVERFLIGHT', 'GROUND']) {
         const n = (d.counts || {})[tag]; if (!n) continue;
         const c = TAG[tag] || C.dim; rect(ix, iy + 1, 5, 5, c);
         text(tag.slice(0, 4), ix + 9, iy, C.dim, 9);
@@ -1090,8 +1242,8 @@
       line('CLOSEST', st.closest, a => a.distance_nm + 'NM');
       line('LOWEST', st.lowest, a => a.alt_ft.toLocaleString() + 'FT');
       line('FASTEST', st.fastest, a => a.gs_kt + 'KT');
-      text('VISIBLE NOW', ix, iy, C.dim, 8); iy += 9;
-      text(String(st.visible), ix, iy, C.green, 9, { bold: true });
+      text('NEAR THE FIELD', ix, iy, C.dim, 8); iy += 9;
+      text(String(st.near), ix, iy, C.green, 9, { bold: true });
       text('TAP A BLIP FOR DETAIL', 132, H - 9, C.faint, 8, { center: true });
     }
 
@@ -1109,7 +1261,6 @@
         ['LATITUDE', latS, C.green],
         ['LONGITUDE', lonS, C.green],
         ['SEARCH RADIUS', (d.radius_nm || '—') + ' NM', C.amber],
-        ['VISIBLE CEILING', '10,000 FT', C.amber],
         ['TIMEZONE', TZ, C.dim],
       ];
       let y = 26;
@@ -1119,9 +1270,9 @@
         stroke(6, rowY, W - 12, 22, C.line);
         text(r[0], 12, rowY + 3, C.dim, 9);
         text(r[1], W - 12, rowY + 3, r[2], 12, { right: true, bold: true });
-        if (r[0] === 'SEARCH RADIUS' || r[0] === 'VISIBLE CEILING') {
+        if (r[0] === 'SEARCH RADIUS') {
           rect(12, rowY + 15, W - 90, 3, C.line);
-          const frac = r[0] === 'SEARCH RADIUS' ? .35 : .5;
+          const frac = .35;
           rect(12, rowY + 15, (W - 90) * frac, 3, C.amber);
           rect(12 + (W - 90) * frac - 2, rowY + 13, 4, 7, C.ink);
         }
@@ -1191,15 +1342,54 @@
       raf = requestAnimationFrame(loop);
     }
 
-    canvas.addEventListener('pointerdown', (e) => {
+    // Pointer -> UI logical (384×216) coordinates.
+    function toLogical(e) {
       const r = canvas.getBoundingClientRect();
-      const x = (e.clientX - r.left) / r.width * W;   // -> UI logical (384)
-      const y = (e.clientY - r.top) / r.height * H;
+      return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+    }
+    function hitAt(x, y) {
       for (let i = hits.length - 1; i >= 0; i--) {
         const h = hits[i];
-        if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) { h.fn(); return; }
+        if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
+      }
+      return null;
+    }
+    const overList = (x, y) => view === 'board' && !filterOpen && listBox &&
+      x >= listBox.x && x <= listBox.x + listBox.w && y >= listBox.y && y <= listBox.y + listBox.h;
+
+    // A press that stays put is a tap (runs the hit under it on release); a press
+    // that moves vertically over the flight list drags it to scroll. Firing on
+    // release — rather than on down — is what lets us tell the two apart.
+    let ptr = null;
+    canvas.addEventListener('pointerdown', (e) => {
+      const p = toLogical(e);
+      ptr = { x0: p.x, y0: p.y, dragging: false, scroll0: listScrollY, onList: overList(p.x, p.y) };
+      try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* not supported */ }
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!ptr) return;
+      const p = toLogical(e);
+      if (ptr.onList && scrollMax > 0) {
+        if (!ptr.dragging && Math.abs(p.y - ptr.y0) > 3) ptr.dragging = true;
+        if (ptr.dragging) listScrollY = Math.max(0, Math.min(scrollMax, ptr.scroll0 - (p.y - ptr.y0)));
       }
     });
+    canvas.addEventListener('pointerup', (e) => {
+      if (!ptr) return;
+      const p = toLogical(e);
+      const moved = Math.abs(p.x - ptr.x0) > 4 || Math.abs(p.y - ptr.y0) > 4;
+      if (!ptr.dragging && !moved) { const h = hitAt(p.x, p.y); if (h) h.fn(); }
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+      ptr = null;
+    });
+    canvas.addEventListener('pointercancel', () => { ptr = null; });
+    canvas.addEventListener('wheel', (e) => {
+      if (scrollMax <= 0) return;
+      const p = toLogical(e);
+      if (!overList(p.x, p.y)) return;
+      listScrollY = Math.max(0, Math.min(scrollMax, listScrollY + e.deltaY));
+      e.preventDefault();
+    }, { passive: false });
     canvas.__setView = (v) => { if (v === 'detail' && !selectedHex) selectedHex = data.flights[0].hex; view = v; };
 
     // The whole board is laid out on a fixed pixel grid tuned for the Silkscreen /

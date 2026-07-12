@@ -55,7 +55,9 @@ Tap the **⚙ gear** on the board (or open **`/settings`**) to set:
 - **Location** — type an address (geocoded via OpenStreetMap), use your device's
   location, or enter latitude/longitude by hand. This is where distances and the
   "look" direction are measured from.
-- **Search radius** and the **"visible" altitude ceiling**.
+- **Search radius** — how far out to pull traffic. Sort and filter the board
+  itself (by distance/altitude, category, or airborne-only) from the **⇅ sort /
+  filter** control on the flight list.
 - **Theme** — the board's look. **Auto** follows the local clock (dawn / day / dusk /
   night scenes swap themselves); or pin a fixed time-of-day, a weather scene
   (overcast / rain / snow / fog), a full-bleed landscape, or the Radar-Ops CRT.

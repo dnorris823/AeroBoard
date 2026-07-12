@@ -133,7 +133,7 @@ def enrich(flights, budget: int = 6) -> None:
 
     `budget` caps how many *new* network lookups we do per snapshot; the rest
     fill in on later refreshes as the cache warms. Flights are assumed already
-    sorted so the nearest/visible ones get routes first.
+    sorted so the nearest ones get routes first.
     """
     used = 0
     for ac in flights:

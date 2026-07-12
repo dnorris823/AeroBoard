@@ -24,7 +24,9 @@
   // GEG is only the *default* home location (used until the user picks their own
   // in Settings). No API call is pinned to it — see getSnapshot / getWeather.
   var GEG_LAT = 47.6199, GEG_LON = -117.5339;
-  var VISIBLE_ALT_FT = 10000, OVERFLIGHT_ALT_FT = 18000;
+  // LOW_ALT_FT is an internal classification band (approach/departure/GA), not a
+  // user setting. OVERFLIGHT_ALT_FT is where a plane reads as a high overflight.
+  var LOW_ALT_FT = 10000, OVERFLIGHT_ALT_FT = 18000;
   var CLIMB_FPM = 300, DESCENT_FPM = -300;
   // airplanes.live only (adsb.lol, the server's fallback, has no CORS header).
   var FLIGHTS_URL = 'https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}';
@@ -59,7 +61,7 @@
   var KEY = 'aeroboard.settings';
   var DEFAULTS = {
     home_lat: GEG_LAT, home_lon: GEG_LON, location_label: 'GEG · Spokane Intl',
-    radius_nm: 40, visible_alt_ft: VISIBLE_ALT_FT, theme: 'auto'
+    radius_nm: 40, theme: 'auto'
   };
   var THEMES = {
     auto: 1, night: 1, poster: 1, crt: 1, night2: 1, poster2: 1,
@@ -84,8 +86,6 @@
       out.home_lon = clamp(parseFloat(patch.home_lon), -180, 180);
     if (patch.radius_nm != null && isFinite(patch.radius_nm))
       out.radius_nm = clamp(parseInt(patch.radius_nm, 10), 1, 250);
-    if (patch.visible_alt_ft != null && isFinite(patch.visible_alt_ft))
-      out.visible_alt_ft = clamp(parseInt(patch.visible_alt_ft, 10), 500, 45000);
     if (patch.location_label != null)
       out.location_label = String(patch.location_label).slice(0, 48);
     if (THEMES[patch.theme]) out.theme = patch.theme;
@@ -109,23 +109,22 @@
       vrate_fpm: num(raw.baro_rate != null ? raw.baro_rate : raw.geom_rate),
       lat: num(raw.lat), lon: num(raw.lon), squawk: raw.squawk || null,
       category: raw.category || null,
-      distance_nm: 0, bearing: 0, tag: 'TRANSIT', visible: false,
+      distance_nm: 0, bearing: 0, tag: 'TRANSIT',
       origin: null, dest: null, origin_city: null, dest_city: null,
       airline_name: null, airline_iata: null, airline_icao: null, airline_country: null
     };
   }
-  function classify(ac, visibleAlt, overflightAlt) {
+  function classify(ac, lowAlt, overflightAlt) {
     if (ac.on_ground) return 'GROUND';
     var alt = ac.alt_ft;
     if (alt == null) return 'TRANSIT';
     if (alt >= overflightAlt) return 'OVERFLIGHT';
-    if (alt <= visibleAlt) {
+    if (alt <= lowAlt) {
       var vr = ac.vrate_fpm || 0;
       if (vr <= DESCENT_FPM) return 'APPROACH';
       if (vr >= CLIMB_FPM) return 'DEPARTURE';
       if ((ac.gs_kt == null ? 999 : ac.gs_kt) < 160 &&
           ((ac.category == null || ac.category === 'A1') || alt <= 5000)) return 'GA';
-      return 'LOW';
     }
     return 'TRANSIT';
   }
@@ -388,7 +387,7 @@
       airline_name: ac.airline_name, airline_iata: ac.airline_iata,
       airline_icao: ac.airline_icao, airline_country: ac.airline_country,
       distance_nm: r1(ac.distance_nm), bearing: r1(ac.bearing),
-      compass: ac.distance_nm ? compass(ac.bearing) : '', tag: ac.tag, visible: ac.visible
+      compass: ac.distance_nm ? compass(ac.bearing) : '', tag: ac.tag
     };
   }
 
@@ -404,14 +403,11 @@
           ac.distance_nm = haversineNm(s.home_lat, s.home_lon, ac.lat, ac.lon);
           ac.bearing = bearingDeg(s.home_lat, s.home_lon, ac.lat, ac.lon);
         }
-        ac.visible = ac.alt_ft != null && ac.alt_ft <= s.visible_alt_ft;
-        ac.tag = classify(ac, s.visible_alt_ft, OVERFLIGHT_ALT_FT);
+        ac.tag = classify(ac, LOW_ALT_FT, OVERFLIGHT_ALT_FT);
         flights.push(ac);
       }
-      flights.sort(function (a, b) {
-        if (a.visible !== b.visible) return a.visible ? -1 : 1;
-        return a.distance_nm - b.distance_nm;
-      });
+      // nearest first (the board can re-sort/filter on the client).
+      flights.sort(function (a, b) { return a.distance_nm - b.distance_nm; });
       // routes + weather in parallel; neither should block the board on failure.
       return Promise.all([enrichRoutes(flights, 6), getWeather(s.home_lat, s.home_lon)]).then(function (res) {
         var weather = res[1] || null;

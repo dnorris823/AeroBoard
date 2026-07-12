@@ -69,7 +69,6 @@ class Aircraft:
     distance_nm: float = 0.0
     bearing: float = 0.0
     tag: str = "TRANSIT"
-    visible: bool = False
     origin: Optional[str] = None
     dest: Optional[str] = None
     origin_city: Optional[str] = None
@@ -91,8 +90,8 @@ def _num(v):
         return None
 
 
-def classify(ac: Aircraft, visible_alt=None, overflight_alt=None) -> str:
-    visible_alt = config.VISIBLE_ALT_FT if visible_alt is None else visible_alt
+def classify(ac: Aircraft, low_alt=None, overflight_alt=None) -> str:
+    low_alt = config.LOW_ALT_FT if low_alt is None else low_alt
     overflight_alt = config.OVERFLIGHT_ALT_FT if overflight_alt is None else overflight_alt
     if ac.on_ground:
         return "GROUND"
@@ -101,7 +100,7 @@ def classify(ac: Aircraft, visible_alt=None, overflight_alt=None) -> str:
         return "TRANSIT"
     if alt >= overflight_alt:
         return "OVERFLIGHT"
-    if alt <= visible_alt:
+    if alt <= low_alt:
         vr = ac.vrate_fpm or 0
         if vr <= config.DESCENT_FPM:
             return "APPROACH"
@@ -110,7 +109,6 @@ def classify(ac: Aircraft, visible_alt=None, overflight_alt=None) -> str:
         # slow + light + low reads as general aviation / pattern work
         if (ac.gs_kt or 999) < 160 and (ac.category in (None, "A1") or (alt <= 5000)):
             return "GA"
-        return "LOW"
     return "TRANSIT"
 
 
@@ -176,7 +174,6 @@ def get_snapshot(
     home_lat = s["home_lat"] if home_lat is None else home_lat
     home_lon = s["home_lon"] if home_lon is None else home_lon
     radius = s["radius_nm"] if radius is None else radius
-    visible_alt = s["visible_alt_ft"]
 
     try:
         raw = _fetch_raw(config.GEG_LAT, config.GEG_LON, radius)
@@ -189,12 +186,11 @@ def get_snapshot(
         if ac.lat is not None and ac.lon is not None:
             ac.distance_nm = haversine_nm(home_lat, home_lon, ac.lat, ac.lon)
             ac.bearing = bearing_deg(home_lat, home_lon, ac.lat, ac.lon)
-        ac.visible = ac.alt_ft is not None and ac.alt_ft <= visible_alt
-        ac.tag = classify(ac, visible_alt, config.OVERFLIGHT_ALT_FT)
+        ac.tag = classify(ac, config.LOW_ALT_FT, config.OVERFLIGHT_ALT_FT)
         flights.append(ac)
 
-    # visible/low aircraft first, then nearest.
-    flights.sort(key=lambda a: (not a.visible, a.distance_nm))
+    # nearest first (the board can re-sort/filter on the client).
+    flights.sort(key=lambda a: a.distance_nm)
     routes.enrich(flights)   # attach origin/dest to airline flights (cached)
     return Snapshot(flights=flights, source="airplanes.live", fetched_at=time.time())
 
