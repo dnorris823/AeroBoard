@@ -84,6 +84,8 @@
     <input type="text" id="label" maxlength="48" placeholder="Home">
     <p class="hint">Distances and the “look” direction are measured from here. Enter an
       address to auto-fill the coordinates, or drop them in by hand.</p>
+    <p class="hint" id="tzLine">Local time there: <span class="readout" id="tzClock">—</span>
+      <span id="tzZone"></span></p>
   </fieldset>
 
   <fieldset>
@@ -155,6 +157,50 @@
   $('radius').addEventListener('input', fmt);
   $('vis').addEventListener('input', fmt);
 
+  // ---- live "local time there" preview -------------------------------------
+  // Mirrors what the board will show: resolve the IANA zone for the entered
+  // lat/lon (getTimeZone, cached/offline-safe) and tick the clock every second.
+  // A request token guards against a slow lookup landing after the coords moved.
+  let curTz = null, tzReq = 0, tzDebounce = 0;
+  function zoneAbbr(tz){
+    try{
+      const p = new Intl.DateTimeFormat('en-US',{ timeZone: tz, timeZoneName: 'short' })
+        .formatToParts(new Date()).find(o => o.type === 'timeZoneName');
+      return p ? p.value : '';
+    }catch(e){ return ''; }
+  }
+  function renderTzClock(){
+    if(!curTz){ $('tzClock').textContent = '—'; return; }
+    try{
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB',
+        { timeZone: curTz, hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false })
+        .formatToParts(new Date()).map(o => [o.type, o.value]));
+      $('tzClock').textContent = `${p.hour}:${p.minute}:${p.second}`;
+    }catch(e){ $('tzClock').textContent = '—'; }
+  }
+  function refreshTz(){
+    const lat = num($('lat').value), lon = num($('lon').value);
+    if(lat === null || lon === null){
+      curTz = null; $('tzZone').textContent = ''; renderTzClock(); return;
+    }
+    const token = ++tzReq;
+    $('tzZone').textContent = curTz ? '' : '(resolving zone…)';
+    window.AeroData.getTimeZone(lat, lon).then(tz => {
+      if(token !== tzReq) return;          // coords changed while we waited
+      curTz = tz || null;
+      $('tzZone').textContent = curTz ? zoneAbbr(curTz) : '(zone unavailable)';
+      renderTzClock();
+    }).catch(() => {
+      if(token !== tzReq) return;
+      curTz = null; $('tzZone').textContent = '(zone unavailable)'; renderTzClock();
+    });
+  }
+  // Debounce manual coord typing; fire immediately for programmatic changes.
+  function scheduleTz(){ clearTimeout(tzDebounce); tzDebounce = setTimeout(refreshTz, 400); }
+  $('lat').addEventListener('input', scheduleTz);
+  $('lon').addEventListener('input', scheduleTz);
+  setInterval(renderTzClock, 1000);
+
   // load current settings (from localStorage, via the client data layer)
   {
     const s = window.AeroData.loadSettings();
@@ -163,6 +209,7 @@
     $('radius').value = s.radius_nm; $('vis').value = s.visible_alt_ft; fmt();
     $('theme').value = s.theme || 'auto';
   }
+  refreshTz();
 
   // address search — OpenStreetMap Nominatim, called straight from the browser
   async function search(){
@@ -183,6 +230,7 @@
           $('lon').value = res.lon.toFixed(4);
           if(!$('label').value) $('label').value = res.label.split(',')[0];
           box.innerHTML = '';
+          refreshTz();
         };
         box.appendChild(b);
       }
@@ -195,7 +243,7 @@
   $('geoBtn').onclick = () => {
     if(!navigator.geolocation){ setStatus('Geolocation not available here', true); return; }
     navigator.geolocation.getCurrentPosition(
-      p => { $('lat').value = p.coords.latitude.toFixed(4); $('lon').value = p.coords.longitude.toFixed(4); },
+      p => { $('lat').value = p.coords.latitude.toFixed(4); $('lon').value = p.coords.longitude.toFixed(4); refreshTz(); },
       () => setStatus('Could not get device location', true)
     );
   };
