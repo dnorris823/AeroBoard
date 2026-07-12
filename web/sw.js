@@ -1,11 +1,12 @@
 /* AeroBoard service worker — caches the app shell so the installed PWA opens
  * and runs without any server. Live data still comes from the network (the
  * public flight/route/weather APIs); only the static files are cached. */
-var CACHE = 'aeroboard-v4';
+var CACHE = 'aeroboard-v5';
 var SHELL = [
   './', 'index.html', 'settings.html',
   'aeroboard-engine.js', 'aeroboard-data.js', 'manifest.webmanifest',
-  'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png'
+  'icon-180.png', 'icon-192.png', 'icon-512.png', 'favicon-32.png',
+  'fonts/silkscreen-400.woff2', 'fonts/silkscreen-700.woff2', 'fonts/vt323-400.woff2'
 ];
 
 self.addEventListener('install', function (e) {

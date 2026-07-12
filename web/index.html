@@ -14,10 +14,20 @@
 <meta name="apple-mobile-web-app-title" content="AeroBoard">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
 <style>
+  /* Self-hosted pixel fonts. These MUST be local + same-origin: the whole board
+     is laid out on a fixed grid tuned to Silkscreen/VT323 metrics, and the fonts
+     are only ever painted on the canvas (never DOM text). WebKit (iPad Safari)
+     won't download a cross-origin @font-face that no DOM node uses, so a
+     Google-Fonts <link> left the installed PWA on a wide system monospace and
+     every label overflowed. Bundling them (and caching them in the service
+     worker) guarantees the correct metrics on every device, online or offline. */
+  @font-face{font-family:'Silkscreen';font-style:normal;font-weight:400;
+    font-display:swap;src:url(fonts/silkscreen-400.woff2) format('woff2');}
+  @font-face{font-family:'Silkscreen';font-style:normal;font-weight:700;
+    font-display:swap;src:url(fonts/silkscreen-700.woff2) format('woff2');}
+  @font-face{font-family:'VT323';font-style:normal;font-weight:400;
+    font-display:swap;src:url(fonts/vt323-400.woff2) format('woff2');}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;}
   body{display:grid;place-items:center;}
   /* The engine sizes the canvas backing store (384×216 or 512×288); CSS just
