@@ -5,13 +5,19 @@
 
    App integration (opts):
    - opts.timeZone   IANA tz used for the on-screen clock and the "auto" theme (default America/Los_Angeles).
+   - opts.lat/lon    board location; drives the local sunrise/sunset the "auto" theme blends to
+                     (defaults to GEG / Spokane).
    - opts.onSettings callback for the header ⚙ (the app routes it to /settings); falls back to the
                      in-canvas settings view when omitted.
    - opts.data       initial data snapshot (defaults to the offline SAMPLE below).
    The returned handle exposes { destroy, setData, setTheme } so the page can feed it live
    /api/flights data and change the look at runtime.
 
-   themeId "auto" follows the local clock, swapping between the dawn/day/dusk/night scenes.
+   themeId "auto" tracks the real sun: it computes local sunrise/sunset from lat/lon (no
+   network) and continuously blends the dawn/day/dusk/night keyframes (palette, sky, sun
+   position and stars) as the sun crosses those events, so the board's sky matches the real
+   sky outside. If sun times are unavailable (polar day/night) it falls back to fixed clock
+   hours. A window.AeroBoardSunTest = { min, sunrise, sunset } override forces a time (dev).
 
    Two scene modes:
    - band  (t1 themes): a 40px living-airport strip along the bottom.
@@ -35,14 +41,67 @@
     ],
   };
 
-  // ---- time-of-day builder: one glass HUD, scene swaps with the clock ----
+  // ---- time-of-day keyframes ------------------------------------------------
+  // The four phases (night/dawn/day/dusk) are keyframes the "auto" theme blends
+  // between as the real sun moves (see sunTimesLocal / mixAt). Each holds a glass
+  // HUD palette (C) and a full-scene palette (S). The palettes are authored so
+  // they interpolate cleanly: every sky keeps its *upper* stops in the cool
+  // blue -> indigo -> near-black family and concentrates warmth in the horizon
+  // stop, so day<->dusk<->night never cross through muddy grey mid-blend.
   const TOD_INK = { ink: '#f4ecd8', dim: '#a9b6cf', faint: '#5f6f90', amber: '#ffbe5f', green: '#6bf0ac', blue: '#7cc0ff', red: '#ff7676' };
+  const TOD_KF = {
+    night: {
+      C: { bg: '#060a14', glow: '#ffd48f', panel: 'rgba(11,18,34,0.60)', panelHi: 'rgba(28,46,76,0.66)', inner: 'rgba(6,11,22,0.55)', glassList: 'rgba(7,13,26,0.46)', line: '#2b4168', ring: 'rgba(107,240,172,0.28)' },
+      S: {
+        night: true, hy: 196, winLit: 1, lights: 1, sky: ['#050a18', '#0b1730', '#1e3559'],
+        ground: '#0a1712', ground2: '#0d1f17', apron: '#0b1a20', far: '#0e2035', mid: '#122a44', near: '#0a1a2e',
+        struct: '#122437', structDark: '#0c1a2a', roof: '#1a3453', metal: '#8294b0',
+        win: '#ffcf87', winOff: '#243a54', runway: '#161f2e', center: '#3a4a66',
+        edge: '#ffdf9a', papiR: '#ff5b5b', taxi: '#5aa9ff', tree: '#0c261c',
+        plane: '#cdd9ec', planeDk: '#8a99b4', tail: '#6db4ff',
+      },
+    },
+    dawn: {
+      C: { bg: '#171334', glow: '#ffcaa0', panel: 'rgba(26,22,46,0.58)', panelHi: 'rgba(54,44,78,0.64)', inner: 'rgba(18,15,34,0.55)', glassList: 'rgba(20,17,38,0.46)', line: '#4a3f68', ring: 'rgba(107,240,172,0.26)' },
+      S: {
+        night: false, hy: 196, winLit: 0.6, lights: 0.5, sky: ['#141f47', '#4a4a72', '#e5975f'],
+        ground: '#2a2436', ground2: '#332b40', apron: '#2b2438', far: '#4a3f63', mid: '#6a5580', near: '#3a3350',
+        struct: '#3a3348', structDark: '#2a2436', roof: '#4a3f63', metal: '#9a90b0',
+        win: '#ffd9a0', winOff: '#3a3550', runway: '#2e2838', center: '#6a5f7a',
+        edge: '#ffe0b0', papiR: '#ff7b6b', taxi: '#8ab0d4', tree: '#2a3a44',
+        plane: '#e6dcee', planeDk: '#a898b8', tail: '#e88ab0',
+      },
+    },
+    day: {
+      C: { bg: '#28394a', glow: '#ffe9a8', panel: 'rgba(14,22,36,0.64)', panelHi: 'rgba(30,48,70,0.68)', inner: 'rgba(8,14,24,0.60)', glassList: 'rgba(10,16,28,0.52)', line: '#33506e', ring: 'rgba(107,240,172,0.30)' },
+      S: {
+        night: false, hy: 196, winLit: 0, lights: 0.15, sky: ['#3f86cf', '#79b2e6', '#c4e2f2'],
+        ground: '#42582f', ground2: '#52683a', apron: '#6a6a58', far: '#7fa0b0', mid: '#6a94a0', near: '#587a68',
+        struct: '#8a8478', structDark: '#6a6458', roof: '#9a5040', metal: '#d8d4c8',
+        win: '#bcd8f0', winOff: '#8a97a4', runway: '#8a8478', center: '#e8e4d8',
+        edge: '#fffbe0', papiR: '#d1403a', taxi: '#3f8fb0', tree: '#33521f',
+        plane: '#f4f0e8', planeDk: '#b8b4a8', tail: '#3f7fb0',
+      },
+    },
+    dusk: {
+      C: { bg: '#38272d', glow: '#ffdf8f', panel: 'rgba(32,22,26,0.58)', panelHi: 'rgba(60,40,44,0.64)', inner: 'rgba(22,14,16,0.55)', glassList: 'rgba(26,16,18,0.46)', line: '#5c4038', ring: 'rgba(107,240,172,0.26)' },
+      S: {
+        night: false, hy: 194, winLit: 0.85, lights: 0.7, sky: ['#2f4d84', '#c06a52', '#f28347'],
+        ground: '#3a2b22', ground2: '#463328', apron: '#4a3629', far: '#a86a55', mid: '#8a5450', near: '#5e3f47',
+        struct: '#5a4236', structDark: '#402e26', roof: '#6e5040', metal: '#d8c49a',
+        win: '#ffe6a3', winOff: '#7a5a44', runway: '#4a382e', center: '#c9a878',
+        edge: '#ffe9b0', papiR: '#d1573e', taxi: '#3f9fb0', tree: '#3a5238',
+        plane: '#f4ead6', planeDk: '#caa87e', tail: '#e8a13c',
+      },
+    },
+  };
+  // ---- time-of-day builder: one glass HUD, scene swaps with the clock ----
   function TOD(scene3, glassC) {
     return {
       id: scene3 + '3', font: "'Silkscreen', monospace", fontSize: 0,
       scene: 'none', scene3: scene3, flap: 'subtle', crt: false, grain: true,
       W: 512, H: 288, fullScene: true, glass: true,
-      C: Object.assign({ sky: ['#000', '#000', '#000'] }, TOD_INK, glassC),
+      C: Object.assign({ sky: ['#000', '#000', '#000'] }, TOD_INK, glassC || TOD_KF[scene3].C),
     };
   }
   function WTH(scene3, weather, glassC) {
@@ -124,37 +183,17 @@
       },
     },
 
-    // ---- t3: time-of-day set ----
-    dawn3: TOD('dawn', {
-      bg: '#171334', glow: '#ffcaa0',
-      panel: 'rgba(26,22,46,0.58)', panelHi: 'rgba(54,44,78,0.64)',
-      inner: 'rgba(18,15,34,0.55)', glassList: 'rgba(20,17,38,0.46)',
-      line: '#4a3f68', ring: 'rgba(107,240,172,0.26)',
-    }),
-    day3: TOD('day', {
-      bg: '#28394a', glow: '#ffe9a8',
-      panel: 'rgba(14,22,36,0.64)', panelHi: 'rgba(30,48,70,0.68)',
-      inner: 'rgba(8,14,24,0.60)', glassList: 'rgba(10,16,28,0.52)',
-      line: '#33506e', ring: 'rgba(107,240,172,0.30)',
-    }),
-    dusk3: TOD('dusk', {
-      bg: '#38272d', glow: '#ffdf8f',
-      panel: 'rgba(32,22,26,0.58)', panelHi: 'rgba(60,40,44,0.64)',
-      inner: 'rgba(22,14,16,0.55)', glassList: 'rgba(26,16,18,0.46)',
-      line: '#5c4038', ring: 'rgba(107,240,172,0.26)',
-    }),
-    night3: TOD('night', {
-      bg: '#060a14', glow: '#ffd48f',
-      panel: 'rgba(11,18,34,0.60)', panelHi: 'rgba(28,46,76,0.66)',
-      inner: 'rgba(6,11,22,0.55)', glassList: 'rgba(7,13,26,0.46)',
-      line: '#2b4168', ring: 'rgba(107,240,172,0.28)',
-    }),
+    // ---- t3: time-of-day set (palettes live in TOD_KF above) ----
+    dawn3: TOD('dawn'),
+    day3: TOD('day'),
+    dusk3: TOD('dusk'),
+    night3: TOD('night'),
 
     // ---- t4: weather set (time-of-day HUD + weather in scene & ATIS ribbon) ----
-    ovc4: WTH('day', 'overcast', { bg: '#28394a', glow: '#ffe9a8', panel: 'rgba(14,22,36,0.64)', panelHi: 'rgba(30,48,70,0.68)', inner: 'rgba(8,14,24,0.60)', glassList: 'rgba(10,16,28,0.52)', line: '#33506e', ring: 'rgba(107,240,172,0.30)' }),
-    rain4: WTH('dusk', 'rain', { bg: '#38272d', glow: '#ffdf8f', panel: 'rgba(32,22,26,0.58)', panelHi: 'rgba(60,40,44,0.64)', inner: 'rgba(22,14,16,0.55)', glassList: 'rgba(26,16,18,0.46)', line: '#5c4038', ring: 'rgba(107,240,172,0.26)' }),
-    snow4: WTH('night', 'snow', { bg: '#060a14', glow: '#ffd48f', panel: 'rgba(11,18,34,0.60)', panelHi: 'rgba(28,46,76,0.66)', inner: 'rgba(6,11,22,0.55)', glassList: 'rgba(7,13,26,0.46)', line: '#2b4168', ring: 'rgba(107,240,172,0.28)' }),
-    fog4: WTH('dawn', 'fog', { bg: '#171334', glow: '#ffcaa0', panel: 'rgba(26,22,46,0.58)', panelHi: 'rgba(54,44,78,0.64)', inner: 'rgba(18,15,34,0.55)', glassList: 'rgba(20,17,38,0.46)', line: '#4a3f68', ring: 'rgba(107,240,172,0.26)' }),
+    ovc4: WTH('day', 'overcast'),
+    rain4: WTH('dusk', 'rain'),
+    snow4: WTH('night', 'snow'),
+    fog4: WTH('dawn', 'fog'),
   };
 
   const TAGMAP = (C) => ({
@@ -169,22 +208,129 @@
     return `rgba(${r},${g},${b},${a})`;
   }
 
+  // ---- colour blending (hex or rgba() -> interpolated rgba() string) --------
+  const lerp = (a, b, f) => a + (b - a) * f;
+  const smooth = (f) => (f <= 0 ? 0 : f >= 1 ? 1 : f * f * (3 - 2 * f));
+  function parseCol(c) {
+    if (typeof c !== 'string') return [0, 0, 0, 1];
+    if (c[0] === '#') {
+      let h = c.slice(1);
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), 1];
+    }
+    const m = c.match(/rgba?\(([^)]+)\)/);
+    if (!m) return [0, 0, 0, 1];
+    const p = m[1].split(',').map(Number);
+    return [p[0], p[1], p[2], p[3] == null ? 1 : p[3]];
+  }
+  function mix(c1, c2, f) {
+    if (f <= 0) return c1; if (f >= 1) return c2;
+    const a = parseCol(c1), b = parseCol(c2);
+    return `rgba(${Math.round(lerp(a[0], b[0], f))},${Math.round(lerp(a[1], b[1], f))},${Math.round(lerp(a[2], b[2], f))},${(+lerp(a[3], b[3], f).toFixed(3))})`;
+  }
+  // blend two TOD scene palettes (TOD_KF[*].S) — numbers lerp, colours mix
+  const S_NUM = ['hy', 'winLit', 'lights'];
+  const S_COL = ['ground', 'ground2', 'apron', 'far', 'mid', 'near', 'struct', 'structDark', 'roof', 'metal', 'win', 'winOff', 'runway', 'center', 'edge', 'papiR', 'taxi', 'tree', 'plane', 'planeDk', 'tail'];
+  function blendScene(A, B, f) {
+    const o = {};
+    for (const k of S_NUM) o[k] = lerp(A[k], B[k], f);
+    for (const k of S_COL) o[k] = mix(A[k], B[k], f);
+    o.sky = [mix(A.sky[0], B.sky[0], f), mix(A.sky[1], B.sky[1], f), mix(A.sky[2], B.sky[2], f)];
+    return o;
+  }
+  // blend two glass HUD palettes (TOD_KF[*].C) into a live C for the auto theme
+  const C_KEYS = ['bg', 'glow', 'panel', 'panelHi', 'inner', 'glassList', 'line', 'ring'];
+  function blendGlass(A, B, f) {
+    const o = Object.assign({ sky: ['#000', '#000', '#000'] }, TOD_INK);
+    for (const k of C_KEYS) o[k] = mix(A[k], B[k], f);
+    return o;
+  }
+
+  // ---- local sunrise / sunset (NOAA sunrise equation, no network) -----------
+  // Minutes to add to UTC to reach the board's wall clock at `date`.
+  function tzOffsetMin(tz, date) {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(date).map((o) => [o.type, o.value]));
+    const h = p.hour === '24' ? 0 : +p.hour;
+    const asUTC = Date.UTC(+p.year, +p.month - 1, +p.day, h, +p.minute, +p.second);
+    return Math.round((asUTC - date.getTime()) / 60000);
+  }
+  // sunrise/sunset for `date` at lat/lon, expressed as minutes past local
+  // midnight (using tzMin). Returns null on polar day/night (caller falls back).
+  function sunTimesLocal(lat, lon, tzMin, date) {
+    const rad = Math.PI / 180;
+    const J = date.getTime() / 86400000 + 2440587.5;          // Julian date (UTC)
+    const n = Math.round(J - 2451545.0 + 0.0008);
+    const Js = n - lon / 360;                                  // mean solar noon
+    const M = (357.5291 + 0.98560028 * Js) % 360;             // solar mean anomaly
+    const Mr = M * rad;
+    const Ceq = 1.9148 * Math.sin(Mr) + 0.02 * Math.sin(2 * Mr) + 0.0003 * Math.sin(3 * Mr);
+    const L = (M + Ceq + 180 + 102.9372) % 360;               // ecliptic longitude
+    const Lr = L * rad;
+    const Jtransit = 2451545.0 + Js + 0.0053 * Math.sin(Mr) - 0.0069 * Math.sin(2 * Lr);
+    const decl = Math.asin(Math.sin(Lr) * Math.sin(23.44 * rad));
+    const cosH = (Math.sin(-0.833 * rad) - Math.sin(lat * rad) * Math.sin(decl)) / (Math.cos(lat * rad) * Math.cos(decl));
+    if (cosH >= 1 || cosH <= -1) return null;                 // sun never rises / never sets
+    const H = Math.acos(cosH) / rad;
+    const toLocalMin = (Jd) => (((Jd + 0.5) % 1) * 1440 + tzMin + 1440) % 1440;  // Julian day .0 = noon UTC
+    return { sunrise: toLocalMin(Jtransit - H / 360), sunset: toLocalMin(Jtransit + H / 360) };
+  }
+  // Which two phase keyframes the sun sits between right now, and the blend
+  // fraction. dawn/dusk are ~W-min ramps centred on the real sunrise/sunset;
+  // day and night are plateaus. Returns { a, b, f }.
+  function mixAt(m, SR, SS, W) {
+    let dawnB = SR + W, duskA = SS - W;
+    if (dawnB > duskA) { const mid = (SR + SS) / 2; dawnB = duskA = mid; }  // very short day
+    if (m < SR - W || m >= SS + W) return { a: 'night', b: 'night', f: 0 };
+    if (m < SR)     return { a: 'night', b: 'dawn', f: smooth((m - (SR - W)) / W) };
+    if (m < dawnB)  return { a: 'dawn', b: 'day', f: smooth((m - SR) / (dawnB - SR)) };
+    if (m < duskA)  return { a: 'day', b: 'day', f: 0 };
+    if (m < SS)     return { a: 'day', b: 'dusk', f: smooth((m - duskA) / (SS - duskA)) };
+    return { a: 'dusk', b: 'night', f: smooth((m - SS) / W) };
+  }
+
   // ============================ ENGINE ============================
   function mount(canvas, themeId, opts) {
     opts = opts || {};
     const TZ = opts.timeZone || 'America/Los_Angeles';
 
-    // "auto" follows the local clock, cycling the time-of-day scenes.
-    function autoThemeId() {
-      const h = parseInt(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', hour12: false }).format(new Date()), 10);
-      if (h >= 5 && h < 8) return 'dawn3';
-      if (h >= 8 && h < 18) return 'day3';
-      if (h >= 18 && h < 21) return 'dusk3';
-      return 'night3';
+    // The board's location drives the local sunrise/sunset used by "auto".
+    const LAT = opts.lat != null ? +opts.lat : 47.6199;
+    const LON = opts.lon != null ? +opts.lon : -117.5339;
+    const RAMP = 55;   // minutes each side of sunrise/sunset for the dawn/dusk blend
+
+    // Today's sun times, recomputed when the local date rolls over. Null on
+    // polar day/night, which sends the auto theme to the fixed-hour fallback.
+    let sunDay = '', sunT = null;
+    function sunTimes() {
+      const now = new Date();
+      const key = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+      if (key !== sunDay) { sunDay = key; sunT = sunTimesLocal(LAT, LON, tzOffsetMin(TZ, now), now); }
+      return sunT;
     }
+    function nowMin() {
+      const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit' }).formatToParts(new Date()).map((o) => [o.type, o.value]));
+      return (p.hour === '24' ? 0 : +p.hour) * 60 + +p.minute;
+    }
+    // Fixed clock-hour phase, used when sun times are unavailable.
+    function autoPhase() {
+      const h = (nowMin() / 60) | 0;
+      if (h >= 5 && h < 8) return 'dawn';
+      if (h >= 8 && h < 18) return 'day';
+      if (h >= 18 && h < 21) return 'dusk';
+      return 'night';
+    }
+    function autoThemeId() { return autoPhase() + '3'; }
+    // The live auto theme: a full-scene glass HUD whose palette + phase blend
+    // is recomputed every frame from the sun's position (see loop()).
+    const AUTO = TOD('night'); AUTO.id = 'auto';
+    let MIX = null;   // { a, b, f } phase blend consumed by P(); null => static theme
+
     let autoMode = (themeId === 'auto');
-    let curId = autoMode ? autoThemeId() : (THEMES[themeId] ? themeId : 'night');
-    let theme = THEMES[curId] || THEMES.night;
+    let curId = autoMode ? 'auto' : (THEMES[themeId] ? themeId : 'night');
+    let theme = autoMode ? AUTO : (THEMES[curId] || THEMES.night);
     let C = theme.C;
     let TAG = TAGMAP(C);
     let FS = theme.fontSize || 0;
@@ -208,9 +354,22 @@
     // swap the active theme in place (palette + scene); resize the canvas if the
     // new theme renders at a different internal resolution.
     function applyTheme(id) {
-      curId = id; theme = THEMES[id]; C = theme.C; TAG = TAGMAP(C); FS = theme.fontSize || 0;
+      curId = id; theme = (id === 'auto') ? AUTO : THEMES[id]; C = theme.C; TAG = TAGMAP(C); FS = theme.fontSize || 0;
       const nCW = theme.W || 384, nCH = theme.H || 216;
       if (nCW !== CW || nCH !== CH) { CW = nCW; CH = nCH; canvas.width = CW * RES; canvas.height = CH * RES; uiScale = CW / W; }
+    }
+    // Recompute the sun-driven phase blend for the current instant. A
+    // window.AeroBoardSunTest = { min, sunrise, sunset } override forces a time
+    // (used for previewing transitions). Updates MIX + the live AUTO palette.
+    function updateAuto() {
+      const ov = (typeof window !== 'undefined') && window.AeroBoardSunTest;
+      let m, SR, SS;
+      if (ov) { m = ov.min; SR = ov.sunrise; SS = ov.sunset; }
+      else { const st = sunTimes(); if (st) { m = nowMin(); SR = st.sunrise; SS = st.sunset; } }
+      MIX = (SR != null && SS != null) ? mixAt(m, SR, SS, RAMP) : (() => { const ph = autoPhase(); return { a: ph, b: ph, f: 0 }; })();
+      AUTO.scene3 = MIX.f < 0.5 ? MIX.a : MIX.b;
+      AUTO.C = blendGlass(TOD_KF[MIX.a].C, TOD_KF[MIX.b].C, MIX.f);
+      C = AUTO.C; TAG = TAGMAP(C);
     }
 
     let data = opts.data || SAMPLE;
@@ -406,43 +565,22 @@
     // ======================================================================
     //  FULL SCENE (t2) — dense full-bleed airport landscape (native CW x CH)
     // ======================================================================
+    // Scene palette for the current instant. In "auto" mode MIX holds two phase
+    // keyframes + a blend fraction (the sun crossing a boundary); otherwise the
+    // active theme picks a single static phase. Blends interpolate the whole
+    // scene palette so the sky, ground, mountains and lights all shift together.
     function P() {
-      const tod = theme.scene3 || (theme.scene2 === 'night' ? 'night' : 'dusk');
-      const base = {
-        night: {
-          night: true, hy: 196, winLit: 1, lights: 1, sky: ['#050a18', '#0b1730', '#22406a'],
-          ground: '#0a1712', ground2: '#0d1f17', apron: '#0b1a20', far: '#0e2035', mid: '#122a44', near: '#0a1a2e',
-          struct: '#122437', structDark: '#0c1a2a', roof: '#1a3453', metal: '#8294b0',
-          win: '#ffcf87', winOff: '#243a54', runway: '#161f2e', center: '#3a4a66',
-          edge: '#ffdf9a', papiR: '#ff5b5b', taxi: '#5aa9ff', tree: '#0c261c',
-          plane: '#cdd9ec', planeDk: '#8a99b4', tail: '#6db4ff',
-        },
-        dawn: {
-          night: false, hy: 196, winLit: 0.6, lights: 0.5, sky: ['#141f47', '#5a4a7c', '#e59a72'],
-          ground: '#2a2436', ground2: '#332b40', apron: '#2b2438', far: '#4a3f63', mid: '#6a5580', near: '#3a3350',
-          struct: '#3a3348', structDark: '#2a2436', roof: '#4a3f63', metal: '#9a90b0',
-          win: '#ffd9a0', winOff: '#3a3550', runway: '#2e2838', center: '#6a5f7a',
-          edge: '#ffe0b0', papiR: '#ff7b6b', taxi: '#8ab0d4', tree: '#2a3a44',
-          plane: '#e6dcee', planeDk: '#a898b8', tail: '#e88ab0',
-        },
-        day: {
-          night: false, hy: 196, winLit: 0, lights: 0.15, sky: ['#3f86cf', '#79b2e6', '#c4e2f2'],
-          ground: '#42582f', ground2: '#52683a', apron: '#6a6a58', far: '#7fa0b0', mid: '#6a94a0', near: '#587a68',
-          struct: '#8a8478', structDark: '#6a6458', roof: '#9a5040', metal: '#d8d4c8',
-          win: '#bcd8f0', winOff: '#8a97a4', runway: '#8a8478', center: '#e8e4d8',
-          edge: '#fffbe0', papiR: '#d1403a', taxi: '#3f8fb0', tree: '#33521f',
-          plane: '#f4f0e8', planeDk: '#b8b4a8', tail: '#3f7fb0',
-        },
-        dusk: {
-          night: false, hy: 194, winLit: 0.85, lights: 0.7, sky: ['#f6c765', '#ef9450', '#cf5f4f'],
-          ground: '#3a2b22', ground2: '#463328', apron: '#4a3629', far: '#a86a55', mid: '#8a5450', near: '#5e3f47',
-          struct: '#5a4236', structDark: '#402e26', roof: '#6e5040', metal: '#d8c49a',
-          win: '#ffe6a3', winOff: '#7a5a44', runway: '#4a382e', center: '#c9a878',
-          edge: '#ffe9b0', papiR: '#d1573e', taxi: '#3f9fb0', tree: '#3a5238',
-          plane: '#f4ead6', planeDk: '#caa87e', tail: '#e8a13c',
-        },
-      };
-      const pp = base[tod] || base.night; pp.tod = tod; return pp;
+      let a, b, f;
+      if (MIX) { a = MIX.a; b = MIX.b; f = MIX.f; }
+      else { a = b = theme.scene3 || (theme.scene2 === 'night' ? 'night' : 'dusk'); f = 0; }
+      const nightAmt = lerp(a === 'night' ? 1 : 0, b === 'night' ? 1 : 0, f);
+      let pp;
+      if (a === b || f <= 0) pp = Object.assign({}, TOD_KF[a].S);
+      else pp = blendScene(TOD_KF[a].S, TOD_KF[b].S, f);
+      pp.tod = f < 0.5 ? a : b;
+      pp.nightAmt = nightAmt;
+      pp.night = nightAmt > 0.5;
+      return pp;
     }
     function ridge(baseY, amp, color, seed) {
       ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(0, CH); ctx.lineTo(0, baseY);
@@ -496,43 +634,64 @@
       g.addColorStop(0, sky[0]); g.addColorStop(.55, sky[1]); g.addColorStop(1, sky[2]);
       rect(0, 0, CW, CH, sky[0]); ctx.fillStyle = g; ctx.fillRect(0, 0, CW, p.hy);
 
-      const sunAt = (sx, sy, halo, haloR, core, coreR, rays) => {
+      // The sun rises from below the horizon at dawn and sinks at dusk; alpha,
+      // size, colour and rays all interpolate between the phase keyframes so the
+      // whole sky reads as one continuous day rather than four fixed scenes.
+      const sunAt = (sx, sy, halo, haloR, core, coreR, rayAmt, alpha) => {
+        if (alpha <= 0.01) return;
+        ctx.globalAlpha = alpha;
         ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx, sy, haloR, 0, 7); ctx.fill();
-        if (rays) {
-          ctx.strokeStyle = 'rgba(255,238,180,.10)'; ctx.lineWidth = 3;
+        if (rayAmt > 0.02) {
+          ctx.strokeStyle = `rgba(255,238,180,${(0.10 * rayAmt).toFixed(3)})`; ctx.lineWidth = 3;
           for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + t * 0.05; ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + Math.cos(a) * 90, sy + Math.sin(a) * 90); ctx.stroke(); }
         }
         ctx.fillStyle = core; ctx.beginPath(); ctx.arc(sx, sy, coreR, 0, 7); ctx.fill();
+        ctx.globalAlpha = 1;
       };
       const drift = (arr, col2, col1) => arr.forEach((c, i) => {
         const off = (t * (6 + i * 3)) % (CW + 160) - 80;
         cloud(((c[0] + off * 0.25) % (CW + 120)) - 40, c[1], c[2], i % 2 ? col2 : col1);
       });
-      if (p.tod === 'night') { if (wx === 'clear') {
+      // phase pair + blend fraction for the celestial elements
+      const phA = MIX ? MIX.a : p.tod, phB = MIX ? MIX.b : p.tod, phF = MIX ? MIX.f : 0;
+      const nAmt = p.nightAmt;
+      // stars + moon fade in with night
+      if (wx === 'clear' && nAmt > 0.02) {
         for (let i = 0; i < 90; i++) {
           const sx = (i * 97) % CW, sy = (i * 53) % (p.hy - 30);
-          ctx.globalAlpha = 0.25 + 0.6 * Math.abs(Math.sin(t * 0.8 + i * 1.7));
+          ctx.globalAlpha = (0.25 + 0.6 * Math.abs(Math.sin(t * 0.8 + i * 1.7))) * nAmt;
           ctx.fillStyle = i % 11 === 0 ? '#bcd0ff' : '#ffffff'; ctx.fillRect(sx, sy, 1, 1);
         }
-        ctx.globalAlpha = 1;
-        const mx = 404, my = 44;
+        const mx = 404, my = 44; ctx.globalAlpha = nAmt;
         ctx.fillStyle = 'rgba(255,240,200,.10)'; ctx.beginPath(); ctx.arc(mx, my, 26, 0, 7); ctx.fill();
         ctx.fillStyle = '#f2ead0'; ctx.beginPath(); ctx.arc(mx, my, 13, 0, 7); ctx.fill();
         ctx.fillStyle = '#d9d0b4'; [[mx - 4, my - 3, 2], [mx + 3, my + 2, 2], [mx - 1, my + 5, 1], [mx + 6, my - 4, 1]].forEach(c => { ctx.beginPath(); ctx.arc(c[0], c[1], c[2], 0, 7); ctx.fill(); });
-      } } else if (p.tod === 'dawn') {
-        if (wx === 'clear') { for (let i = 0; i < 40; i++) {
-          const sx = (i * 97) % CW, sy = (i * 41) % Math.floor(p.hy * 0.4);
-          ctx.globalAlpha = 0.12 + 0.22 * Math.abs(Math.sin(t * 0.6 + i)); ctx.fillStyle = '#dfe4ff'; ctx.fillRect(sx, sy, 1, 1);
-        }
-        ctx.globalAlpha = 1; }
-        sunAt(150, p.hy - 4, 'rgba(255,190,160,.18)', 46, '#ffdcc0', 11, false);
-        drift([[300, 46, 1.2], [430, 66, 0.9]], 'rgba(210,160,170,.4)', 'rgba(240,200,190,.5)');
-      } else if (p.tod === 'day') {
-        sunAt(126, 52, 'rgba(255,250,220,.20)', 44, '#fffbe0', 16, true);
-        drift([[280, 44, 1.5], [420, 70, 1.1], [200, 32, 0.9], [360, 96, 1.2]], 'rgba(255,255,255,.7)', 'rgba(245,250,255,.85)');
-      } else { // dusk
-        sunAt(128, 96, 'rgba(255,240,190,.14)', 48, '#fff0c0', 24, true);
-        drift([[300, 40, 1.4], [420, 70, 1.0], [220, 34, 0.9]], 'rgba(247,220,180,.5)', 'rgba(255,235,205,.6)');
+        ctx.globalAlpha = 1;
+      }
+      // sun — position/size/colour blended across the phase keyframes
+      const SUN = {
+        night: { x: 150, y: 250, hr: 40, cr: 10, a: 0, rays: 0, halo: 'rgba(255,190,160,.18)', core: '#ffdcc0' },
+        dawn:  { x: 150, y: p.hy - 4, hr: 46, cr: 11, a: 1, rays: 0, halo: 'rgba(255,190,160,.18)', core: '#ffdcc0' },
+        day:   { x: 126, y: 52, hr: 44, cr: 16, a: 1, rays: 1, halo: 'rgba(255,250,220,.20)', core: '#fffbe0' },
+        dusk:  { x: 128, y: 96, hr: 48, cr: 24, a: 1, rays: 0, halo: 'rgba(255,240,190,.14)', core: '#fff0c0' },
+      };
+      const sa = SUN[phA] || SUN.night, sb = SUN[phB] || SUN.night;
+      sunAt(lerp(sa.x, sb.x, phF), lerp(sa.y, sb.y, phF),
+        mix(sa.halo, sb.halo, phF), lerp(sa.hr, sb.hr, phF),
+        mix(sa.core, sb.core, phF), lerp(sa.cr, sb.cr, phF),
+        lerp(sa.rays, sb.rays, phF), lerp(sa.a, sb.a, phF));
+      // clouds — tint blends between phases, fade out toward deep night
+      if (nAmt < 0.98) {
+        const CLOUD = {
+          night: ['rgba(150,165,200,.30)', 'rgba(120,140,180,.25)'],
+          dawn:  ['rgba(240,200,190,.5)', 'rgba(210,160,170,.4)'],
+          day:   ['rgba(255,255,255,.7)', 'rgba(245,250,255,.85)'],
+          dusk:  ['rgba(255,235,205,.6)', 'rgba(247,220,180,.5)'],
+        };
+        const ca = CLOUD[phA] || CLOUD.night, cb = CLOUD[phB] || CLOUD.night;
+        ctx.globalAlpha = 1 - nAmt;
+        drift([[280, 44, 1.5], [420, 70, 1.1], [200, 32, 0.9], [360, 96, 1.2]], mix(ca[0], cb[0], phF), mix(ca[1], cb[1], phF));
+        ctx.globalAlpha = 1;
       }
 
       if (wx === 'overcast') {
@@ -919,11 +1078,13 @@
       ctx.setTransform(RES, 0, 0, RES, 0, 0);
       postFx();
     }
-    let autoCheck = 0;
+    let autoCheck = 1e9;
     function loop(now) {
       const dt = (now - lastT) / 1000; lastT = now; t += dt;
       if (!reduce) { sweep = (sweep + dt * 1.4) % (Math.PI * 2); beacon += dt * 2.2; }
-      if (autoMode) { autoCheck += dt; if (autoCheck > 20) { autoCheck = 0; const id = autoThemeId(); if (id !== curId) applyTheme(id); } }
+      // Re-derive the sun-driven blend a few times a minute — the phase moves
+      // slowly, so this is cheap, and P()/drawFullScene read MIX every frame.
+      if (autoMode) { autoCheck += dt; if (autoCheck > 15) { autoCheck = 0; updateAuto(); } }
       draw();
       raf = requestAnimationFrame(loop);
     }
@@ -961,8 +1122,8 @@
       destroy() { destroyed = true; cancelAnimationFrame(raf); },
       setData(nd) { if (nd) data = nd; },
       setTheme(id) {
-        if (id === 'auto') { autoMode = true; applyTheme(autoThemeId()); }
-        else if (THEMES[id]) { autoMode = false; applyTheme(id); }
+        if (id === 'auto') { autoMode = true; applyTheme('auto'); autoCheck = 1e9; }
+        else if (THEMES[id]) { autoMode = false; MIX = null; applyTheme(id); }
       },
     };
   }

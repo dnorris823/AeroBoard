@@ -50,8 +50,10 @@
   const TZ = 'America/Los_Angeles';   // GEG lives in Spokane (Pacific)
 
   function boot(theme) {
+    const s0 = window.AeroData.loadSettings();
     const app = window.AeroBoard.mount(cv, theme || 'auto', {
       timeZone: TZ,
+      lat: s0.home_lat, lon: s0.home_lon,   // drives local sunrise/sunset for "auto"
       onSettings: () => { location.href = 'settings.html'; },
     });
 
