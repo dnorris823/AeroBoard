@@ -47,7 +47,8 @@
 <script>
 (() => {
   const cv = document.getElementById('screen');
-  const TZ = 'America/Los_Angeles';   // GEG lives in Spokane (Pacific)
+  // Follow the device's own timezone so the clock is correct wherever the board runs.
+  const TZ = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'America/Los_Angeles';
 
   function boot(theme) {
     const s0 = window.AeroData.loadSettings();

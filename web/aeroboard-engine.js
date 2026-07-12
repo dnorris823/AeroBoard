@@ -28,8 +28,8 @@
 (function () {
   // ---- offline sample (verbatim from the repo, +1 GA for a fuller board) ----
   const SAMPLE = {
-    airport: 'GEG', radius_nm: 40, source: 'airplanes.live', error: null, tracking: 6,
-    location_label: 'GEG (airport)',
+    radius_nm: 40, source: 'airplanes.live', error: null, tracking: 6,
+    location_label: 'GEG · Spokane Intl',
     counts: { APPROACH: 2, DEPARTURE: 1, GA: 2, OVERFLIGHT: 1 },
     flights: [
       { hex: 'a1b2c3', label: 'SKW5612', reg: 'N612SY', type: 'E75L', alt_ft: 2900, on_ground: false, gs_kt: 139, track: 210, vrate_fpm: -640, squawk: '4571', origin: 'SEA', dest: 'GEG', origin_city: 'Seattle', dest_city: 'Spokane', distance_nm: 2.9, bearing: 41, compass: 'NE', tag: 'APPROACH', visible: true },
@@ -295,6 +295,15 @@
   function mount(canvas, themeId, opts) {
     opts = opts || {};
     const TZ = opts.timeZone || 'America/Los_Angeles';
+    // Short zone abbreviation for the footer clock (e.g. PDT, CEST, GMT+9),
+    // derived from TZ so it follows the location instead of a hardcoded "PT".
+    const TZABBR = (() => {
+      try {
+        const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'short' })
+          .formatToParts(new Date()).find(o => o.type === 'timeZoneName');
+        return p ? p.value : '';
+      } catch (e) { return ''; }
+    })();
 
     // The board's location drives the local sunrise/sunset used by "auto".
     const LAT = opts.lat != null ? +opts.lat : 47.6199;
@@ -462,7 +471,7 @@
       bearingTri(132, yy + 8, w.windDir, 4, C.green);
       text(w.windDir + '° ' + w.windKt + 'KT', 140, yy + 3, C.green, 9);
       text('VIS ' + w.visSM, 224, yy + 3, C.dim, 9);
-      text(live ? 'GEG METAR' : 'GEG ATIS', W - 4, yy + 3, C.faint, 8, { right: true });
+      text(live ? 'LIVE WX' : 'WX SCENE', W - 4, yy + 3, C.faint, 8, { right: true });
     }
     function wxMini(x, yy) {
       const w = wxInfo(); if (!w) return;
@@ -829,8 +838,18 @@
     function drawBoard(d) {
       const hasBand = theme.scene !== 'none';
       rect(0, 0, W, 15, C.panel); rect(0, 15, W, 1, C.line);
-      text('GEG', 5, 3, C.amber, 12, { bold: true, glow: theme.crt ? true : ((theme.id === 'night' || theme.id === 'night2' || theme.id === 'night3') ? C.glow : false) });
-      text('SPOKANE INTL', 40, 4, C.dim, 10);
+      // Title comes from the configured location: first word is the big "code",
+      // the remainder is the subtitle — so any place in the world reads sensibly.
+      const lbl = (d.location_label || 'AeroBoard').trim();
+      const sp = lbl.search(/[ ,·]/);
+      const code = (sp < 0 ? lbl : lbl.slice(0, sp)).toUpperCase().slice(0, 12);
+      const sub = (sp < 0 ? '' : lbl.slice(sp + 1).replace(/^[\s,·]+/, '')).toUpperCase();
+      text(code, 5, 3, C.amber, 12, { bold: true, glow: theme.crt ? true : ((theme.id === 'night' || theme.id === 'night2' || theme.id === 'night3') ? C.glow : false) });
+      if (sub) {
+        ctx.font = `bold ${12 + FS}px ${theme.font}`;   // measure the code to place the subtitle
+        const codeW = ctx.measureText(code).width;
+        text(sub.slice(0, 22), 5 + codeW + 6, 4, C.dim, 10);
+      }
       text(clock().hhmm, W / 2, 3, C.ink, 12, { bold: true, center: true });
       text('TRACKING ' + d.tracking, W - 20, 4, C.dim, 10, { right: true });
       text('⚙', W - 9, 3, C.dim, 12, { center: true });
@@ -845,7 +864,7 @@
       const maxRows = Math.floor((listBottom - top) / rowH);
       if (theme.id === 'poster') rect(0, hb, 252, listBottom - hb, C.panel);
       else if (theme.glass) rect(0, hb, 253, listBottom - hb, C.glassList);
-      if (!d.flights.length && !d.error) text('quiet skies over GEG', listX + 8, top + 20, C.dim, 12);
+      if (!d.flights.length && !d.error) text('quiet skies overhead', listX + 8, top + 20, C.dim, 12);
       d.flights.slice(0, maxRows).forEach((ac, i) => {
         const y = top + i * rowH;
         const col = TAG[ac.tag] || C.dim;
@@ -1001,14 +1020,16 @@
       backButton();
       text('SETTINGS', W / 2, 4, C.ink, 11, { bold: true, center: true });
       if (wxState()) wxMini(292, 3);
+      const latS = Math.abs(LAT).toFixed(4) + '° ' + (LAT >= 0 ? 'N' : 'S');
+      const lonS = Math.abs(LON).toFixed(4) + '° ' + (LON >= 0 ? 'E' : 'W');
       const rows = [
-        ['LOCATION', 'GEG · Spokane Intl', C.ink],
+        ['LOCATION', (d.location_label || '—').slice(0, 22), C.ink],
         ['ADDRESS', 'set via address lookup', C.dim],
-        ['LATITUDE', '47.6199° N', C.green],
-        ['LONGITUDE', '117.5339° W', C.green],
-        ['SEARCH RADIUS', '40 NM', C.amber],
+        ['LATITUDE', latS, C.green],
+        ['LONGITUDE', lonS, C.green],
+        ['SEARCH RADIUS', (d.radius_nm || '—') + ' NM', C.amber],
         ['VISIBLE CEILING', '10,000 FT', C.amber],
-        ['TIMEZONE', 'America/Los_Angeles', C.dim],
+        ['TIMEZONE', TZ, C.dim],
       ];
       let y = 26;
       rows.forEach((r, i) => {
@@ -1040,7 +1061,7 @@
         const lv = d.live !== false;
         text(lv ? 'LIVE' : 'SAMPLE', 128, y + 1, lv ? C.green : C.amber, 9);
       }
-      text(clock().hms + ' PT', W - 4, y + 1, C.dim, 9, { right: true });
+      text(clock().hms + (TZABBR ? ' ' + TZABBR : ''), W - 4, y + 1, C.dim, 9, { right: true });
     }
 
     // ---- post fx (native res) ----
