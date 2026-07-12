@@ -241,6 +241,48 @@
     })['catch'](function () { return wxKey === key ? wxCache : null; });  // keep last good for this spot
   }
 
+  // ---- timezone (IANA zone for a lat/lon, via Open-Meteo) -----------------
+  // The board's clock and "auto" theme should read local-to-the-location time,
+  // not the device's. Open-Meteo returns the IANA zone (e.g. "Asia/Tokyo") for
+  // any coordinate with timezone=auto; we cache it (memory + localStorage) keyed
+  // by rounded lat/lon so a known spot resolves instantly and works offline.
+  var TZ_KEY = 'aeroboard.tz';
+  var tzMem = {};
+  function tzCacheKey(lat, lon) { return (+lat).toFixed(2) + ',' + (+lon).toFixed(2); }
+  function tzFromStore(key) {
+    if (tzMem[key]) return tzMem[key];
+    try {
+      var raw = localStorage.getItem(TZ_KEY);
+      var map = raw ? JSON.parse(raw) : {};
+      if (map && map[key]) { tzMem[key] = map[key]; return map[key]; }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function tzToStore(key, tz) {
+    tzMem[key] = tz;
+    try {
+      var raw = localStorage.getItem(TZ_KEY);
+      var map = raw ? JSON.parse(raw) : {};
+      map[key] = tz;
+      localStorage.setItem(TZ_KEY, JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }
+  function getTimeZone(lat, lon) {
+    var key = tzCacheKey(lat, lon);
+    var cached = tzFromStore(key);
+    if (cached) return Promise.resolve(cached);
+    var url = WX_URL + '?latitude=' + lat + '&longitude=' + lon +
+      '&current=temperature_2m&forecast_days=1&timezone=auto';
+    return fetch(url, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('tz HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var tz = j && j.timezone;
+      if (tz) tzToStore(key, tz);
+      return tz || null;
+    })['catch'](function () { return null; });   // caller keeps the device zone
+  }
+
   // ---- snapshot: the object the engine consumes ---------------------------
   function toFlightDict(ac) {
     return {
@@ -291,6 +333,7 @@
 
   window.AeroData = {
     getSnapshot: getSnapshot,
+    getTimeZone: getTimeZone,
     loadSettings: loadSettings,
     saveSettings: saveSettings,
     DEFAULTS: DEFAULTS,
