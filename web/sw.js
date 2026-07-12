@@ -1,7 +1,7 @@
 /* AeroBoard service worker — caches the app shell so the installed PWA opens
  * and runs without any server. Live data still comes from the network (the
  * public flight/route/weather APIs); only the static files are cached. */
-var CACHE = 'aeroboard-v13';
+var CACHE = 'aeroboard-v14';
 var SHELL = [
   './', 'index.html', 'settings.html',
   'aeroboard-engine.js', 'aeroboard-data.js', 'manifest.webmanifest',
@@ -10,8 +10,18 @@ var SHELL = [
 ];
 
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); })
-    .then(function () { return self.skipWaiting(); }));
+  // Fetch each shell file with cache:'reload' so we bypass the browser's HTTP
+  // cache. GitHub Pages serves the static files with a ~10-minute max-age, so a
+  // plain addAll() right after a release can re-cache the *previous* build's
+  // files under the new cache name — the version stamp updates but the page
+  // content doesn't. Forcing a network revalidation keeps the two in sync.
+  e.waitUntil(caches.open(CACHE).then(function (c) {
+    return Promise.all(SHELL.map(function (url) {
+      return fetch(new Request(url, { cache: 'reload' })).then(function (res) {
+        if (res && res.ok) return c.put(url, res);
+      });
+    }));
+  }).then(function () { return self.skipWaiting(); }));
 });
 
 self.addEventListener('activate', function (e) {
