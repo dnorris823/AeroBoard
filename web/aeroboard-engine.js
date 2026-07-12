@@ -10,8 +10,8 @@
    - opts.onSettings callback for the header ⚙ (the app routes it to /settings); falls back to the
                      in-canvas settings view when omitted.
    - opts.data       initial data snapshot (defaults to the offline SAMPLE below).
-   The returned handle exposes { destroy, setData, setTheme } so the page can feed it live
-   /api/flights data and change the look at runtime.
+   The returned handle exposes { destroy, setData, setTheme, setTimeZone } so the page can feed it
+   live /api/flights data, change the look, and retune the clock to the board location at runtime.
 
    themeId "auto" tracks the real sun: it computes local sunrise/sunset from lat/lon (no
    network) and continuously blends the dawn/day/dusk/night keyframes (palette, sky, sun
@@ -294,16 +294,20 @@
   // ============================ ENGINE ============================
   function mount(canvas, themeId, opts) {
     opts = opts || {};
-    const TZ = opts.timeZone || 'America/Los_Angeles';
+    // TZ/TZABBR are mutable: the page resolves the *location's* IANA zone
+    // asynchronously (from lat/lon) and pushes it in via setTimeZone(), so the
+    // clock and "auto" theme run on local-to-the-board time, not the device's.
+    let TZ = opts.timeZone || 'America/Los_Angeles';
     // Short zone abbreviation for the footer clock (e.g. PDT, CEST, GMT+9),
     // derived from TZ so it follows the location instead of a hardcoded "PT".
-    const TZABBR = (() => {
+    function zoneAbbr(tz) {
       try {
-        const p = new Intl.DateTimeFormat('en-US', { timeZone: TZ, timeZoneName: 'short' })
+        const p = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'short' })
           .formatToParts(new Date()).find(o => o.type === 'timeZoneName');
         return p ? p.value : '';
       } catch (e) { return ''; }
-    })();
+    }
+    let TZABBR = zoneAbbr(TZ);
 
     // The board's location drives the local sunrise/sunset used by "auto".
     const LAT = opts.lat != null ? +opts.lat : 47.6199;
@@ -1145,6 +1149,13 @@
       setTheme(id) {
         if (id === 'auto') { autoMode = true; applyTheme('auto'); autoCheck = 1e9; }
         else if (THEMES[id]) { autoMode = false; MIX = null; applyTheme(id); }
+      },
+      // Switch the clock / "auto" theme to the board location's IANA zone once
+      // the page has resolved it from lat/lon. Resetting sunDay forces the
+      // sunrise/sunset table to recompute against the new offset.
+      setTimeZone(tz) {
+        if (!tz || tz === TZ) return;
+        TZ = tz; TZABBR = zoneAbbr(TZ); sunDay = '';
       },
     };
   }

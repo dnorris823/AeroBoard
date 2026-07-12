@@ -47,16 +47,24 @@
 <script>
 (() => {
   const cv = document.getElementById('screen');
-  // Follow the device's own timezone so the clock is correct wherever the board runs.
-  const TZ = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'America/Los_Angeles';
+  // The device zone is only a first-paint fallback: the board should show the
+  // *location's* wall-clock time, so once we resolve the zone for the saved
+  // lat/lon we push it into the engine. This keeps the clock (and the "auto"
+  // time-of-day theme) honest when the board is pointed at a far-away airport.
+  const DEVICE_TZ = (Intl.DateTimeFormat().resolvedOptions().timeZone) || 'America/Los_Angeles';
 
   function boot(theme) {
     const s0 = window.AeroData.loadSettings();
     const app = window.AeroBoard.mount(cv, theme || 'auto', {
-      timeZone: TZ,
+      timeZone: DEVICE_TZ,
       lat: s0.home_lat, lon: s0.home_lon,   // drives local sunrise/sunset for "auto"
       onSettings: () => { location.href = 'settings.html'; },
     });
+
+    // Retune the clock/auto theme to the board location's zone (cached, offline-safe).
+    window.AeroData.getTimeZone(s0.home_lat, s0.home_lon)
+      .then((tz) => { if (tz) app.setTimeZone(tz); })
+      .catch(() => { /* keep the device zone */ });
 
     // Live data: fetch everything client-side (no server). If a fetch fails we
     // keep the last snapshot / built-in sample so the board still renders.
