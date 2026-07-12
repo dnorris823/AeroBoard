@@ -283,6 +283,64 @@
     })['catch'](function () { return null; });   // caller keeps the device zone
   }
 
+  // ---- reverse geocode: a human label for a coordinate --------------------
+  // So the location label can follow the pin the same way the clock does: hand
+  // it a lat/lon and get back a short "City, Region" string. Uses OSM Nominatim
+  // (same service the address search uses) and caches the answer the same way
+  // as the timezone — memory + localStorage, keyed by rounded lat/lon — so a
+  // known spot resolves instantly and a repeat lookup works offline.
+  var PLACE_KEY = 'aeroboard.place';
+  var placeMem = {};
+  function placeFromStore(key) {
+    if (placeMem[key]) return placeMem[key];
+    try {
+      var raw = localStorage.getItem(PLACE_KEY);
+      var map = raw ? JSON.parse(raw) : {};
+      if (map && map[key]) { placeMem[key] = map[key]; return map[key]; }
+    } catch (e) { /* ignore */ }
+    return null;
+  }
+  function placeToStore(key, label) {
+    placeMem[key] = label;
+    try {
+      var raw = localStorage.getItem(PLACE_KEY);
+      var map = raw ? JSON.parse(raw) : {};
+      map[key] = label;
+      localStorage.setItem(PLACE_KEY, JSON.stringify(map));
+    } catch (e) { /* ignore */ }
+  }
+  // Collapse Nominatim's address object into a compact "City, Region" label,
+  // falling back through the coarser place fields (down to just a country) and
+  // finally the raw display_name when the structured parts are missing.
+  function labelFromPlace(j) {
+    var a = j && j.address;
+    if (a) {
+      var city = a.city || a.town || a.village || a.hamlet || a.suburb ||
+                 a.municipality || a.city_district || a.county;
+      var region = a.state || a.country;
+      if (city && region && city !== region) return (city + ', ' + region).slice(0, 48);
+      if (city) return String(city).slice(0, 48);
+      if (region) return String(region).slice(0, 48);
+    }
+    if (j && j.display_name) return String(j.display_name).split(',')[0].trim().slice(0, 48);
+    return null;
+  }
+  function getPlaceLabel(lat, lon) {
+    var key = tzCacheKey(lat, lon);
+    var cached = placeFromStore(key);
+    if (cached) return Promise.resolve(cached);
+    var url = 'https://nominatim.openstreetmap.org/reverse?format=json&zoom=10' +
+      '&addressdetails=1&lat=' + encodeURIComponent(lat) + '&lon=' + encodeURIComponent(lon);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('reverse HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      var label = labelFromPlace(j);
+      if (label) placeToStore(key, label);
+      return label || null;
+    })['catch'](function () { return null; });   // caller keeps whatever label it had
+  }
+
   // ---- snapshot: the object the engine consumes ---------------------------
   function toFlightDict(ac) {
     return {
@@ -334,6 +392,7 @@
   window.AeroData = {
     getSnapshot: getSnapshot,
     getTimeZone: getTimeZone,
+    getPlaceLabel: getPlaceLabel,
     loadSettings: loadSettings,
     saveSettings: saveSettings,
     DEFAULTS: DEFAULTS,
