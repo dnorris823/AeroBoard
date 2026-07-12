@@ -110,7 +110,8 @@
       lat: num(raw.lat), lon: num(raw.lon), squawk: raw.squawk || null,
       category: raw.category || null,
       distance_nm: 0, bearing: 0, tag: 'TRANSIT', visible: false,
-      origin: null, dest: null, origin_city: null, dest_city: null
+      origin: null, dest: null, origin_city: null, dest_city: null,
+      airline_name: null, airline_iata: null, airline_icao: null, airline_country: null
     };
   }
   function classify(ac, visibleAlt, overflightAlt) {
@@ -152,11 +153,16 @@
       var fr = resp.flightroute || {};
       var o = fr.origin || {}, d = fr.destination || {};
       if (!o.iata_code || !d.iata_code) return null;
+      var al = fr.airline || {};
       return {
         origin: o.iata_code, origin_city: o.municipality || null,
         origin_lat: num(o.latitude), origin_lon: num(o.longitude),
         dest: d.iata_code, dest_city: d.municipality || null,
-        dest_lat: num(d.latitude), dest_lon: num(d.longitude)
+        dest_lat: num(d.latitude), dest_lon: num(d.longitude),
+        // airline identity is tied to the callsign, valid even if the leg isn't
+        airline_name: al.name || null, airline_iata: al.iata || null,
+        airline_icao: al.icao || null,
+        airline_country: al.country_iso || al.country || null
       };
     })['catch'](function () { return null; });
   }
@@ -204,7 +210,12 @@
     return dOP <= limit && dDP <= limit;
   }
   function applyRoute(ac, route) {
-    if (!route || !routeConsistent(ac, route)) return;
+    if (!route) return;
+    // Airline identity holds regardless of leg consistency; only trust the
+    // route endpoints when the live position confirms them.
+    ac.airline_name = route.airline_name; ac.airline_iata = route.airline_iata;
+    ac.airline_icao = route.airline_icao; ac.airline_country = route.airline_country;
+    if (!routeConsistent(ac, route)) return;
     ac.origin = route.origin; ac.origin_city = route.origin_city;
     ac.dest = route.dest; ac.dest_city = route.dest_city;
   }
@@ -374,6 +385,8 @@
       alt_ft: r0(ac.alt_ft), on_ground: ac.on_ground, gs_kt: r0(ac.gs_kt),
       track: r0(ac.track), vrate_fpm: r0(ac.vrate_fpm), squawk: ac.squawk,
       origin: ac.origin, dest: ac.dest, origin_city: ac.origin_city, dest_city: ac.dest_city,
+      airline_name: ac.airline_name, airline_iata: ac.airline_iata,
+      airline_icao: ac.airline_icao, airline_country: ac.airline_country,
       distance_nm: r1(ac.distance_nm), bearing: r1(ac.bearing),
       compass: ac.distance_nm ? compass(ac.bearing) : '', tag: ac.tag, visible: ac.visible
     };

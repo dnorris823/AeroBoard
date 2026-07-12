@@ -74,6 +74,10 @@ class Aircraft:
     dest: Optional[str] = None
     origin_city: Optional[str] = None
     dest_city: Optional[str] = None
+    airline_name: Optional[str] = None
+    airline_iata: Optional[str] = None
+    airline_icao: Optional[str] = None
+    airline_country: Optional[str] = None
 
     @property
     def label(self) -> str:

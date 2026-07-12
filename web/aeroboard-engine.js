@@ -32,12 +32,12 @@
     location_label: 'GEG · Spokane Intl',
     counts: { APPROACH: 2, DEPARTURE: 1, GA: 2, OVERFLIGHT: 1 },
     flights: [
-      { hex: 'a1b2c3', label: 'SKW5612', reg: 'N612SY', type: 'E75L', alt_ft: 2900, on_ground: false, gs_kt: 139, track: 210, vrate_fpm: -640, squawk: '4571', origin: 'SEA', dest: 'GEG', origin_city: 'Seattle', dest_city: 'Spokane', distance_nm: 2.9, bearing: 41, compass: 'NE', tag: 'APPROACH', visible: true },
-      { hex: 'a2c4e6', label: 'DAL1853', reg: 'N301DN', type: 'A320', alt_ft: 5400, on_ground: false, gs_kt: 216, track: 225, vrate_fpm: -900, squawk: '3422', origin: 'SLC', dest: 'GEG', origin_city: 'Salt Lake City', dest_city: 'Spokane', distance_nm: 11.1, bearing: 47, compass: 'NE', tag: 'APPROACH', visible: true },
+      { hex: 'a1b2c3', label: 'SKW5612', reg: 'N612SY', type: 'E75L', alt_ft: 2900, on_ground: false, gs_kt: 139, track: 210, vrate_fpm: -640, squawk: '4571', origin: 'SEA', dest: 'GEG', origin_city: 'Seattle', dest_city: 'Spokane', airline_name: 'SkyWest Airlines', airline_iata: 'OO', airline_icao: 'SKW', airline_country: 'US', distance_nm: 2.9, bearing: 41, compass: 'NE', tag: 'APPROACH', visible: true },
+      { hex: 'a2c4e6', label: 'DAL1853', reg: 'N301DN', type: 'A320', alt_ft: 5400, on_ground: false, gs_kt: 216, track: 225, vrate_fpm: -900, squawk: '3422', origin: 'SLC', dest: 'GEG', origin_city: 'Salt Lake City', dest_city: 'Spokane', airline_name: 'Delta Air Lines', airline_iata: 'DL', airline_icao: 'DAL', airline_country: 'US', distance_nm: 11.1, bearing: 47, compass: 'NE', tag: 'APPROACH', visible: true },
       { hex: 'b3d5f7', label: 'N7908L', reg: 'N7908L', type: 'BE23', alt_ft: 3275, on_ground: false, gs_kt: 96, track: 90, vrate_fpm: 520, squawk: '1200', origin: null, dest: null, distance_nm: 0.9, bearing: 135, compass: 'SE', tag: 'DEPARTURE', visible: true },
       { hex: 'c4e6a8', label: 'N738BS', reg: 'N738BS', type: 'C172', alt_ft: 3300, on_ground: false, gs_kt: 103, track: 20, vrate_fpm: 0, squawk: '1200', origin: null, dest: null, distance_nm: 6.2, bearing: 20, compass: 'NNE', tag: 'GA', visible: true },
       { hex: 'e0a1b2', label: 'N512CP', reg: 'N512CP', type: 'PA28', alt_ft: 4100, on_ground: false, gs_kt: 88, track: 160, vrate_fpm: 200, squawk: '1200', origin: null, dest: null, distance_nm: 9.4, bearing: 300, compass: 'NW', tag: 'GA', visible: false },
-      { hex: 'd5f7b9', label: 'ACA109', reg: 'C-GHQY', type: 'A321', alt_ft: 34000, on_ground: false, gs_kt: 358, track: 300, vrate_fpm: 0, squawk: '2701', origin: 'YVR', dest: 'SFO', origin_city: 'Vancouver', dest_city: 'San Francisco', distance_nm: 22, bearing: 300, compass: 'NW', tag: 'OVERFLIGHT', visible: false },
+      { hex: 'd5f7b9', label: 'ACA109', reg: 'C-GHQY', type: 'A321', alt_ft: 34000, on_ground: false, gs_kt: 358, track: 300, vrate_fpm: 0, squawk: '2701', origin: 'YVR', dest: 'SFO', origin_city: 'Vancouver', dest_city: 'San Francisco', airline_name: 'Air Canada', airline_iata: 'AC', airline_icao: 'ACA', airline_country: 'CA', distance_nm: 22, bearing: 300, compass: 'NW', tag: 'OVERFLIGHT', visible: false },
     ],
   };
 
@@ -114,6 +114,41 @@
     rain:     { label: 'RAIN',     tempF: 47, windDir: 210, windKt: 15, visSM: '3SM' },
     snow:     { label: 'SNOW',     tempF: 28, windDir: 340, windKt: 9,  visSM: '1SM' },
     fog:      { label: 'FOG',      tempF: 38, windDir: 150, windKt: 3,  visSM: '1/4SM' },
+  };
+
+  // ---- airline brand colors -------------------------------------------------
+  // Keyed by ICAO callsign prefix (SWA284 -> SWA) so a brand chip can show from
+  // the callsign alone, even before adsbdb resolves the airline. Each entry is
+  // [primary, secondary] approximating the carrier's livery. Colors are only
+  // ever painted inside self-contained chips/bars (which carry their own
+  // contrast), so they stay legible across all 15 themes. Unknown carriers get
+  // no chip and fall back to today's plain layout. AIRLINE_IATA supplies the
+  // two-letter badge code when adsbdb hasn't (yet) returned one.
+  const AIRLINE_BRAND = {
+    // US mainline
+    AAL: ['#0078d2', '#c8102e'], DAL: ['#1a3668', '#e01933'], UAL: ['#005daa', '#1f2a44'],
+    SWA: ['#304cb2', '#f9b612'], ASA: ['#01426a', '#54c0e8'], JBU: ['#003876', '#00a1de'],
+    NKS: ['#ffec00', '#1a1a1a'], FFT: ['#00854a', '#1f6b3b'], HAL: ['#4c0f6b', '#e6007e'],
+    AAY: ['#003087', '#f47920'], SCX: ['#00539b', '#e01933'], MXY: ['#0033a0', '#6cace4'],
+    VXP: ['#f37021', '#4b2e83'],
+    // US regionals (often the actual metal near GEG)
+    SKW: ['#0a4d8c', '#8f9fb3'], ENY: ['#0078d2', '#c8102e'], RPA: ['#0033a0', '#da291c'],
+    EDV: ['#1a3668', '#e01933'], ASH: ['#0a4d8c', '#9aa6b5'], QXE: ['#01426a', '#54c0e8'],
+    JIA: ['#0078d2', '#c8102e'], AWI: ['#005daa', '#9aa6b5'], GJS: ['#0a4d8c', '#9aa6b5'],
+    // Canada
+    ACA: ['#d81e05', '#1a1a1a'], WJA: ['#0f3583', '#00a2e1'], JZA: ['#d81e05', '#6b7280'],
+    ROU: ['#8a1538', '#d81e05'], POE: ['#003da5', '#6b7280'], FLE: ['#00a94f', '#1a1a1a'],
+    SWG: ['#f58220', '#003da5'], TSC: ['#00539b', '#0093d0'],
+    // Cargo
+    FDX: ['#4d148c', '#ff6600'], UPS: ['#4f3222', '#ffb500'], GTI: ['#0a4d8c', '#9aa6b5'],
+    ABX: ['#0033a0', '#9aa6b5'], CKS: ['#00539b', '#9aa6b5'],
+  };
+  const AIRLINE_IATA = {
+    AAL: 'AA', DAL: 'DL', UAL: 'UA', SWA: 'WN', ASA: 'AS', JBU: 'B6', NKS: 'NK', FFT: 'F9',
+    HAL: 'HA', AAY: 'G4', SCX: 'SY', MXY: 'MX', VXP: 'XP', SKW: 'OO', ENY: 'MQ', RPA: 'YX',
+    EDV: '9E', ASH: 'YV', QXE: 'QX', JIA: 'OH', AWI: 'ZW', GJS: 'G7', ACA: 'AC', WJA: 'WS',
+    JZA: 'QK', ROU: 'RV', POE: 'PD', FLE: 'F8', SWG: 'WG', TSC: 'TS', FDX: 'FX', UPS: '5X',
+    GTI: '5Y', ABX: 'GB', CKS: 'K4',
   };
 
   // ============================ THEMES ============================
@@ -441,6 +476,37 @@
     }
     const rect = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
     function stroke(x, y, w, h, c) { ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, w - 1, h - 1); }
+
+    // ---- airline branding -------------------------------------------------
+    // ICAO key for an aircraft: adsbdb's airline ICAO when known, else the
+    // callsign prefix (SWA284 -> SWA). Returns null unless we have a brand color.
+    function brandKey(ac) {
+      const icao = ac.airline_icao || ((/^([A-Z]{3})[0-9]/.exec(ac.label || '') || [])[1]);
+      return icao && AIRLINE_BRAND[icao] ? icao : null;
+    }
+    const brandCode = (ac, key) => (ac.airline_iata || AIRLINE_IATA[key] || key || '').slice(0, 3);
+    // black or white — whichever is legible on a solid brand color
+    function inkOn(hex) {
+      const h = hex.replace('#', '');
+      const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+      return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#101010' : '#f5f5f5';
+    }
+    // Swept "tail fin" chip: brand primary fill, secondary base stripe, and the
+    // IATA/ICAO code in a contrast-safe ink. Evokes an airline tail within the
+    // pixel art without shipping any logo assets.
+    function tailBadge(x, y, ac, key) {
+      const c1 = AIRLINE_BRAND[key][0], c2 = AIRLINE_BRAND[key][1], w = 22, h = 20, skew = 5;
+      ctx.fillStyle = c1; ctx.beginPath();
+      ctx.moveTo(x + skew, y); ctx.lineTo(x + w, y);
+      ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
+      rect(x, y + h - 3, w, 3, c2);   // two-tone base stripe
+      text(brandCode(ac, key), x + skew + (w - skew) / 2, y + 5, inkOn(c1), 10, { center: true, bold: true });
+    }
+    // Vertical brand accent bar down the left edge of the detail header.
+    function accentBar(key) {
+      rect(4, 20, 3, 40, AIRLINE_BRAND[key][0]);
+      rect(4, 60, 3, 13, AIRLINE_BRAND[key][1]);
+    }
     function clock() {
       const f = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
       const p = Object.fromEntries(f.formatToParts(new Date()).map(o => [o.type, o.value]));
@@ -938,16 +1004,27 @@
       const col = TAG[ac.tag] || C.dim;
       if (theme.glass) rect(0, 17, W, H - 17, C.glassList);
       text(ac.tag, W - 4, 4, col, 10, { right: true, bold: true });
-      if (theme.flap === 'full' || theme.flap === 'subtle') flapRow(ac.label, 12, 22, 13, 15, C.ink);
-      else text(ac.label, 12, 22, C.ink, 22, { bold: true, glow: theme.crt });
+      const bkey = brandKey(ac);
+      let labelX = 12;
+      if (bkey) { accentBar(bkey); tailBadge(12, 22, ac, bkey); labelX = 38; }
+      if (theme.flap === 'full' || theme.flap === 'subtle') flapRow(ac.label, labelX, 22, 13, 15, C.ink);
+      else text(ac.label, labelX, 22, C.ink, 22, { bold: true, glow: theme.crt });
+      // airline name from adsbdb (shown for any known carrier; the brand chip
+      // above only appears for carriers we have a color for). Country is the
+      // ISO code, e.g. "US". Falls back to the route cities when unknown.
+      const airlineStr = ac.airline_name
+        ? ac.airline_name + (ac.airline_country ? '  ·  ' + ac.airline_country : '')
+        : null;
+      const typeReg = (ac.type || '—') + ' · ' + (ac.reg || '—');
       const routeStr = (ac.origin && ac.dest) ? ac.origin + ' → ' + ac.dest : null;
       if (routeStr) {
         text(routeStr, 12, 46, C.blue, 15, { bold: true });
+        text(typeReg, 232, 50, C.dim, 9, { right: true });   // right of route, clear of it
         const cities = [ac.origin_city, ac.dest_city].filter(Boolean).join(' → ');
-        text((ac.type || '—') + ' · ' + (ac.reg || '—') + (cities ? '   ·   ' + cities : ''), 12, 64, C.dim, 9);
+        text(airlineStr || cities, 12, 64, C.dim, 9);
       } else {
-        text((ac.type || '—') + '  ·  ' + (ac.reg || '—'), 12, 48, C.dim, 11);
-        text('scheduled route unavailable', 12, 64, C.faint, 9);
+        text(typeReg, 12, 48, C.dim, 11);
+        text(airlineStr || 'scheduled route unavailable', 12, 64, airlineStr ? C.dim : C.faint, 9);
       }
       rect(12, 76, W - 24, 1, C.line);
       const lx = 14; let ly = 82;

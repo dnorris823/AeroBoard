@@ -54,6 +54,7 @@ def _fetch(callsign: str):
     o, d = fr.get("origin") or {}, fr.get("destination") or {}
     if not o.get("iata_code") or not d.get("iata_code"):
         return None
+    al = fr.get("airline") or {}
     return {
         "origin": o.get("iata_code"),
         "origin_city": o.get("municipality"),
@@ -63,6 +64,12 @@ def _fetch(callsign: str):
         "dest_city": d.get("municipality"),
         "dest_lat": _num(d.get("latitude")),
         "dest_lon": _num(d.get("longitude")),
+        # airline identity is tied to the callsign, so it's valid even when the
+        # specific leg (origin/dest) can't be verified below.
+        "airline_name": al.get("name") or None,
+        "airline_iata": al.get("iata") or None,
+        "airline_icao": al.get("icao") or None,
+        "airline_country": al.get("country_iso") or al.get("country") or None,
     }
 
 
@@ -143,8 +150,15 @@ def enrich(flights, budget: int = 6) -> None:
                 route = None
             _cache[cs] = (route, time.time() + (_TTL_OK if route else _TTL_MISS))
             used += 1
-        if route and _route_consistent(ac, route):
-            ac.origin = route["origin"]
-            ac.origin_city = route["origin_city"]
-            ac.dest = route["dest"]
-            ac.dest_city = route["dest_city"]
+        if route:
+            # Airline identity holds regardless of leg consistency; the route
+            # endpoints are only trusted when the live position confirms them.
+            ac.airline_name = route["airline_name"]
+            ac.airline_iata = route["airline_iata"]
+            ac.airline_icao = route["airline_icao"]
+            ac.airline_country = route["airline_country"]
+            if _route_consistent(ac, route):
+                ac.origin = route["origin"]
+                ac.origin_city = route["origin_city"]
+                ac.dest = route["dest"]
+                ac.dest_city = route["dest_city"]
