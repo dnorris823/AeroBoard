@@ -7,8 +7,11 @@
  *
  *   flights  -> api.airplanes.live      (ADS-B, no key, ACAO:*)
  *   routes   -> api.adsbdb.com          (callsign -> origin/dest, ACAO:*)
- *   weather  -> api.weather.gov  (NWS)  (KGEG observations, no key, ACAO:*)
+ *   weather  -> api.open-meteo.com      (global, by lat/lon, no key, ACAO:*)
  *   settings -> localStorage            (was settings.json on the server)
+ *
+ * Everything is keyed off the configured home lat/lon (Settings), so the board
+ * works at any location worldwide — nothing is tied to Spokane/GEG.
  *
  * It exposes window.AeroData.getSnapshot(), which returns exactly the object
  * shape the pixel engine consumes (the old /api/flights payload), plus
@@ -18,14 +21,16 @@
   'use strict';
 
   // ---- config (mirrors aeroboard/config.py) -------------------------------
+  // GEG is only the *default* home location (used until the user picks their own
+  // in Settings). No API call is pinned to it — see getSnapshot / getWeather.
   var GEG_LAT = 47.6199, GEG_LON = -117.5339;
   var VISIBLE_ALT_FT = 10000, OVERFLIGHT_ALT_FT = 18000;
   var CLIMB_FPM = 300, DESCENT_FPM = -300;
   // airplanes.live only (adsb.lol, the server's fallback, has no CORS header).
   var FLIGHTS_URL = 'https://api.airplanes.live/v2/point/{lat}/{lon}/{radius}';
   var ROUTE_URL = 'https://api.adsbdb.com/v0/callsign/';
-  var NWS_URL = 'https://api.weather.gov/stations/KGEG/observations/latest';
-  var METAR_STATION = 'KGEG';
+  // Open-Meteo: global current-conditions by lat/lon, keyless, CORS-enabled.
+  var WX_URL = 'https://api.open-meteo.com/v1/forecast';
 
   // ---- geometry (mirrors data.py) -----------------------------------------
   var EARTH_NM = 3440.065, D2R = Math.PI / 180;
@@ -53,7 +58,7 @@
   // ---- settings (mirrors settings.py, backed by localStorage) -------------
   var KEY = 'aeroboard.settings';
   var DEFAULTS = {
-    home_lat: GEG_LAT, home_lon: GEG_LON, location_label: 'GEG (airport)',
+    home_lat: GEG_LAT, home_lon: GEG_LON, location_label: 'GEG · Spokane Intl',
     radius_nm: 40, visible_alt_ft: VISIBLE_ALT_FT, theme: 'auto'
   };
   var THEMES = {
@@ -179,10 +184,8 @@
     ac.dest = route.dest; ac.dest_city = route.dest_city;
   }
 
-  // ---- weather (was aviationweather METAR; now NWS observations) ----------
-  var wxCache = null, wxAt = 0, WX_TTL = 600 * 1000;
-
-  function cToF(c) { return c == null ? null : Math.round(c * 9 / 5 + 32); }
+  // ---- weather (Open-Meteo current conditions, global, by lat/lon) --------
+  var wxCache = null, wxAt = 0, wxKey = '', WX_TTL = 600 * 1000;
 
   function visDisplay(sm) {
     if (sm == null) return '--';
@@ -190,59 +193,52 @@
     if (sm >= 3) return Math.round(sm) + 'SM';
     return (Math.round(sm * 4) / 4) + 'SM';   // quarter-mile resolution when low
   }
-  function classifyWx(wx, clouds, visVal) {
-    wx = (wx || '').toUpperCase();
-    if (/SN|SG|PL/.test(wx)) return 'snow';
-    if (/RA|DZ|SH|TS|GR|GS|UP/.test(wx)) return 'rain';
-    if (/FG|BR|FU/.test(wx) || (visVal != null && visVal <= 1.0)) return 'fog';
-    var covers = {};
-    for (var i = 0; i < (clouds || []).length; i++) {
-      var c = clouds[i]; if (c) covers[(c.cover || '').toUpperCase()] = 1;
-    }
-    if (covers.OVC || covers.BKN || covers.OVX) return 'overcast';
-    return 'clear';
+  // WMO weather codes -> the five looks the engine can paint.
+  function wmoState(code) {
+    if (code == null) return 'clear';
+    code = +code;
+    if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return 'rain';
+    if (code === 45 || code === 48) return 'fog';
+    if (code === 3) return 'overcast';
+    return 'clear';   // 0/1/2 = clear .. partly cloudy
   }
-  // Turn NWS presentWeather[] (+ rawMessage) into a METAR-ish string we can scan.
-  function wxString(props) {
-    var parts = [];
-    var pw = props.presentWeather || [];
-    for (var i = 0; i < pw.length; i++) {
-      if (pw[i].rawString) parts.push(pw[i].rawString);
-      var w = (pw[i].weather || '').toLowerCase();
-      if (/snow|ice pellet/.test(w)) parts.push('SN');
-      else if (/rain|drizzle|thunder|hail/.test(w)) parts.push('RA');
-      else if (/fog|mist|haze|smoke/.test(w)) parts.push('BR');
-    }
-    if (props.rawMessage) parts.push(props.rawMessage);
-    return parts.join(' ');
-  }
-  function fetchWeather() {
-    return fetch(NWS_URL, { cache: 'no-store' }).then(function (r) {
+  function fetchWeather(lat, lon) {
+    var url = WX_URL + '?latitude=' + lat + '&longitude=' + lon +
+      '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m' +
+      '&hourly=visibility&temperature_unit=fahrenheit&wind_speed_unit=kn' +
+      '&forecast_days=1&timezone=auto';
+    return fetch(url, { cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error('wx HTTP ' + r.status);
       return r.json();
     }).then(function (j) {
-      var p = j.properties || {};
-      var visM = p.visibility ? p.visibility.value : null;
+      var c = j.current || {};
+      // visibility (metres) for the current hour, from the hourly series
+      var visM = null;
+      if (j.hourly && j.hourly.time && j.hourly.visibility) {
+        var ch = (c.time || '').slice(0, 13);
+        for (var i = 0; i < j.hourly.time.length; i++) {
+          if (j.hourly.time[i].slice(0, 13) === ch) { visM = j.hourly.visibility[i]; break; }
+        }
+      }
       var visSm = visM == null ? null : visM / 1609.34;
-      var clouds = (p.cloudLayers || []).map(function (l) { return { cover: l.amount }; });
-      var state = classifyWx(wxString(p), clouds, visSm);
-      var wspdKmh = p.windSpeed ? p.windSpeed.value : null;
-      var wdir = p.windDirection ? p.windDirection.value : null;
+      var state = wmoState(c.weather_code);
       return {
         state: state, label: state.toUpperCase(),
-        tempF: cToF(p.temperature ? p.temperature.value : null),
-        windDir: wdir == null ? 0 : Math.round(wdir),
-        windKt: wspdKmh == null ? 0 : Math.round(wspdKmh / 1.852),
-        visSM: visDisplay(visSm), station: METAR_STATION
+        tempF: c.temperature_2m == null ? null : Math.round(c.temperature_2m),
+        windDir: c.wind_direction_10m == null ? 0 : Math.round(c.wind_direction_10m),
+        windKt: c.wind_speed_10m == null ? 0 : Math.round(c.wind_speed_10m),
+        visSM: visDisplay(visSm)
       };
     });
   }
-  function getWeather() {
+  function getWeather(lat, lon) {
+    var key = (+lat).toFixed(3) + ',' + (+lon).toFixed(3);
     var now = Date.now();
-    if (wxCache && (now - wxAt) < WX_TTL) return Promise.resolve(wxCache);
-    return fetchWeather().then(function (w) {
-      wxCache = w; wxAt = now; return w;
-    })['catch'](function () { return wxCache; });  // keep last good / null
+    if (wxCache && wxKey === key && (now - wxAt) < WX_TTL) return Promise.resolve(wxCache);
+    return fetchWeather(lat, lon).then(function (w) {
+      wxCache = w; wxAt = now; wxKey = key; return w;
+    })['catch'](function () { return wxKey === key ? wxCache : null; });  // keep last good for this spot
   }
 
   // ---- snapshot: the object the engine consumes ---------------------------
@@ -261,7 +257,7 @@
   function getSnapshot() {
     var s = loadSettings();
     var raw;
-    return fetchFlights(GEG_LAT, GEG_LON, s.radius_nm).then(function (list) {
+    return fetchFlights(s.home_lat, s.home_lon, s.radius_nm).then(function (list) {
       raw = list;
       var flights = [];
       for (var i = 0; i < raw.length; i++) {
@@ -279,7 +275,7 @@
         return a.distance_nm - b.distance_nm;
       });
       // routes + weather in parallel; neither should block the board on failure.
-      return Promise.all([enrichRoutes(flights, 6), getWeather()]).then(function (res) {
+      return Promise.all([enrichRoutes(flights, 6), getWeather(s.home_lat, s.home_lon)]).then(function (res) {
         var weather = res[1] || null;
         var dicts = flights.map(toFlightDict), counts = {};
         for (var k = 0; k < dicts.length; k++)
@@ -287,7 +283,7 @@
         return {
           flights: dicts, counts: counts, source: 'airplanes.live', error: null,
           tracking: dicts.length, radius_nm: s.radius_nm,
-          location_label: s.location_label, airport: 'GEG', weather: weather, live: true
+          location_label: s.location_label, weather: weather, live: true
         };
       });
     });
