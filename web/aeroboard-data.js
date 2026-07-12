@@ -154,7 +154,9 @@
       if (!o.iata_code || !d.iata_code) return null;
       return {
         origin: o.iata_code, origin_city: o.municipality || null,
-        dest: d.iata_code, dest_city: d.municipality || null
+        origin_lat: num(o.latitude), origin_lon: num(o.longitude),
+        dest: d.iata_code, dest_city: d.municipality || null,
+        dest_lat: num(d.latitude), dest_lon: num(d.longitude)
       };
     })['catch'](function () { return null; });
   }
@@ -178,8 +180,31 @@
       applyRoute(ac, route);
     });
   }
+  // adsbdb keys routes by flight number, which airlines reuse across legs, so a
+  // returned route can belong to a different leg than the aircraft is flying
+  // now. Reject a route when the aircraft's live position sits too far off the
+  // direct origin->destination path. Mirrors routes.py _route_consistent.
+  var CORRIDOR_NM = 100, ENDPOINT_MARGIN_NM = 100;
+  function routeConsistent(ac, route) {
+    var oLat = route.origin_lat, oLon = route.origin_lon;
+    var dLat = route.dest_lat, dLon = route.dest_lon;
+    if (ac.lat == null || ac.lon == null ||
+        oLat == null || oLon == null || dLat == null || dLon == null) return true;
+    var dOD = haversineNm(oLat, oLon, dLat, dLon);
+    var dOP = haversineNm(oLat, oLon, ac.lat, ac.lon);
+    var dDP = haversineNm(dLat, dLon, ac.lat, ac.lon);
+    if (dOD > 0) {
+      var ang13 = dOP / EARTH_NM;
+      var dth = (bearingDeg(oLat, oLon, ac.lat, ac.lon) -
+                 bearingDeg(oLat, oLon, dLat, dLon)) * D2R;
+      var s = Math.max(-1, Math.min(1, Math.sin(ang13) * Math.sin(dth)));
+      if (Math.abs(Math.asin(s)) * EARTH_NM > CORRIDOR_NM) return false;
+    }
+    var limit = dOD + ENDPOINT_MARGIN_NM;
+    return dOP <= limit && dDP <= limit;
+  }
   function applyRoute(ac, route) {
-    if (!route) return;
+    if (!route || !routeConsistent(ac, route)) return;
     ac.origin = route.origin; ac.origin_city = route.origin_city;
     ac.dest = route.dest; ac.dest_city = route.dest_city;
   }
