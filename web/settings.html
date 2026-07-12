@@ -56,6 +56,8 @@
   input[type=range]{width:100%;accent-color:var(--blue);height:26px;}
   .status{margin-top:12px;font-size:13px;min-height:18px;}
   .status.ok{color:var(--green);} .status.err{color:var(--red);}
+  .buildrow{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .buildrow .readout{font-size:15px;}
 </style>
 </head>
 <body>
@@ -129,6 +131,17 @@
 
   <button type="button" class="save" id="saveBtn">SAVE</button>
   <div class="status" id="status"></div>
+
+  <fieldset style="margin-top:22px;">
+    <legend>About</legend>
+    <div class="buildrow">
+      <span>Build <span class="readout" id="ver">…</span></span>
+      <button type="button" class="ghost" id="updBtn">Check for updates</button>
+    </div>
+    <p class="hint">This is the build currently cached on <em>this</em> device. Tap “Check for
+      updates” to pull the latest from the network and reload — handy on the iPad after a new
+      release.</p>
+  </fieldset>
 </div>
 
 <script src="aeroboard-data.js"></script>
@@ -208,6 +221,45 @@
 
   // Offline app shell (https / localhost only; a no-op elsewhere).
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+  // ---- build stamp + update check ------------------------------------------
+  // The version is the active service-worker cache name (see CACHE in sw.js), so
+  // there's a single place to bump on release and what we show here is exactly the
+  // build this device is actually running — the reliable way to confirm a refresh
+  // landed on the iPad.
+  const verEl = $('ver');
+  async function showVersion(){
+    try{
+      if(!('caches' in window)){ verEl.textContent = 'network'; return; }
+      const mine = (await caches.keys()).filter(k => k.startsWith('aeroboard-')).sort();
+      verEl.textContent = mine.length ? mine[mine.length - 1].replace('aeroboard-', '') : 'network';
+    }catch(e){ verEl.textContent = 'network'; }
+  }
+  showVersion();
+
+  // When a new worker takes control (our sw.js self-activates via skipWaiting +
+  // clients.claim), reload once so the fresh files are shown.
+  let reloading = false;
+  const reloadOnce = () => { if(!reloading){ reloading = true; location.reload(); } };
+  if ('serviceWorker' in navigator)
+    navigator.serviceWorker.addEventListener('controllerchange', reloadOnce);
+
+  $('updBtn').onclick = async () => {
+    if(!('serviceWorker' in navigator)){ setStatus('No app cache here — you’re on the live network copy.', false); return; }
+    setStatus('Checking for updates…', false);
+    try{
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(!reg){ setStatus('No app cache here — you’re on the live network copy.', false); return; }
+      await reg.update();
+      if(reg.installing || reg.waiting){
+        setStatus('Update found — reloading…', false);
+        setTimeout(reloadOnce, 2500);   // fallback if controllerchange doesn't fire
+      }else{
+        setStatus('You’re on the latest build ✓', false);
+        showVersion();
+      }
+    }catch(e){ setStatus('Update check failed: ' + e.message, true); }
+  };
 })();
 </script>
 </body>
