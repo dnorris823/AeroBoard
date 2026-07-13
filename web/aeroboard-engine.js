@@ -98,7 +98,7 @@
   // ---- time-of-day builder: one glass HUD, scene swaps with the clock ----
   function TOD(scene3, glassC) {
     return {
-      id: scene3 + '3', font: "'Silkscreen', monospace", fontSize: 0,
+      id: scene3 + '3', font: "'Space Mono', monospace", fontSize: 0,
       scene: 'none', scene3: scene3, flap: 'subtle', crt: false, grain: true,
       W: 512, H: 288, fullScene: true, glass: true,
       C: Object.assign({ sky: ['#000', '#000', '#000'] }, TOD_INK, glassC || TOD_KF[scene3].C),
@@ -155,7 +155,7 @@
   const THEMES = {
     // ---- t1: band scene, opaque panels, 384x216 ----
     night: {
-      id: 'night', font: "'Silkscreen', monospace", fontSize: 0,
+      id: 'night', font: "'Space Mono', monospace", fontSize: 0,
       scene: 'night', flap: 'subtle', crt: false, grain: true,
       C: {
         bg: '#070b16', panel: '#0d1526', panelHi: '#152238', line: '#243b5c',
@@ -166,7 +166,7 @@
       },
     },
     poster: {
-      id: 'poster', font: "'Silkscreen', monospace", fontSize: 0,
+      id: 'poster', font: "'Space Mono', monospace", fontSize: 0,
       scene: 'sunset', flap: 'full', crt: false, grain: true,
       C: {
         bg: '#f2e6cf', panel: '#1d3a4a', panelHi: '#264d61', line: '#0e2530',
@@ -190,7 +190,7 @@
 
     // ---- t2: full-bleed dense landscape, glass panels, 512x288 ----
     night2: {
-      id: 'night2', font: "'Silkscreen', monospace", fontSize: 0,
+      id: 'night2', font: "'Space Mono', monospace", fontSize: 0,
       scene: 'none', scene2: 'night', flap: 'subtle', crt: false, grain: true,
       W: 512, H: 288, fullScene: true, glass: true,
       C: {
@@ -204,7 +204,7 @@
       },
     },
     poster2: {
-      id: 'poster2', font: "'Silkscreen', monospace", fontSize: 0,
+      id: 'poster2', font: "'Space Mono', monospace", fontSize: 0,
       scene: 'none', scene2: 'sunset', flap: 'full', crt: false, grain: true,
       W: 512, H: 288, fullScene: true, glass: true,
       C: {
@@ -1392,16 +1392,17 @@
     }, { passive: false });
     canvas.__setView = (v) => { if (v === 'detail' && !selectedHex) selectedHex = data.flights[0].hex; view = v; };
 
-    // The whole board is laid out on a fixed pixel grid tuned for the Silkscreen /
-    // VT323 pixel fonts. Those fonts are only ever painted on the canvas, never in
-    // the DOM — and WebKit (iPad Safari) won't download an @font-face that isn't
-    // matched to DOM text, so the canvas would fall back to a wide system monospace
-    // and every label would overflow its box. Ask the Font Loading API to fetch them
-    // explicitly (Safari honours this) and hold the first paint until they're ready,
-    // with a timeout so a slow/offline font load never leaves the screen blank.
+    // The whole board is laid out on a fixed grid tuned for the board fonts
+    // (Space Mono, and VT323 for the CRT theme). Those fonts are only ever
+    // painted on the canvas, never in the DOM — and WebKit (iPad Safari) won't
+    // download an @font-face that isn't matched to DOM text, so the canvas would
+    // fall back to a wide system monospace and every label would overflow its box.
+    // Ask the Font Loading API to fetch them explicitly (Safari honours this) and
+    // hold the first paint until they're ready, with a timeout so a slow/offline
+    // font load never leaves the screen blank.
     let raf = 0, destroyed = false;
     function begin() { if (!destroyed && !raf) raf = requestAnimationFrame(loop); }
-    const fontsToLoad = ["700 16px 'Silkscreen'", "400 16px 'Silkscreen'", "400 16px 'VT323'"];
+    const fontsToLoad = ["700 16px 'Space Mono'", "400 16px 'Space Mono'", "400 16px 'VT323'"];
     if (window.document && document.fonts && document.fonts.load) {
       Promise.race([
         Promise.all(fontsToLoad.map(f => document.fonts.load(f).catch(() => {}))),

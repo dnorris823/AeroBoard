@@ -15,17 +15,19 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <style>
-  /* Self-hosted pixel fonts. These MUST be local + same-origin: the whole board
-     is laid out on a fixed grid tuned to Silkscreen/VT323 metrics, and the fonts
-     are only ever painted on the canvas (never DOM text). WebKit (iPad Safari)
-     won't download a cross-origin @font-face that no DOM node uses, so a
-     Google-Fonts <link> left the installed PWA on a wide system monospace and
-     every label overflowed. Bundling them (and caching them in the service
-     worker) guarantees the correct metrics on every device, online or offline. */
-  @font-face{font-family:'Silkscreen';font-style:normal;font-weight:400;
-    font-display:swap;src:url(fonts/silkscreen-400.woff2) format('woff2');}
-  @font-face{font-family:'Silkscreen';font-style:normal;font-weight:700;
-    font-display:swap;src:url(fonts/silkscreen-700.woff2) format('woff2');}
+  /* Self-hosted board fonts. These MUST be local + same-origin: the whole board
+     is laid out on a fixed grid tuned to the font metrics, and the fonts are
+     only ever painted on the canvas (never DOM text). WebKit (iPad Safari) won't
+     download a cross-origin @font-face that no DOM node uses, so a Google-Fonts
+     <link> left the installed PWA on a wide system monospace and every label
+     overflowed. Bundling them (and caching them in the service worker)
+     guarantees the correct metrics on every device, online or offline.
+     Space Mono is the primary board face — its open W/4/8 read far better in
+     bold than the old Silkscreen pixel font. VT323 stays for the CRT theme. */
+  @font-face{font-family:'Space Mono';font-style:normal;font-weight:400;
+    font-display:swap;src:url(fonts/spacemono-400.woff2) format('woff2');}
+  @font-face{font-family:'Space Mono';font-style:normal;font-weight:700;
+    font-display:swap;src:url(fonts/spacemono-700.woff2) format('woff2');}
   @font-face{font-family:'VT323';font-style:normal;font-weight:400;
     font-display:swap;src:url(fonts/vt323-400.woff2) format('woff2');}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;}
