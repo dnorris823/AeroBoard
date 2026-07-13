@@ -64,7 +64,7 @@
     radius_nm: 40, theme: 'auto'
   };
   var THEMES = {
-    auto: 1, night: 1, poster: 1, crt: 1, night2: 1, poster2: 1,
+    auto: 1, night2: 1, poster2: 1,
     dawn3: 1, day3: 1, dusk3: 1, night3: 1, ovc4: 1, rain4: 1, snow4: 1, fog4: 1
   };
 
@@ -75,6 +75,9 @@
       var raw = localStorage.getItem(KEY);
       if (raw) { var p = JSON.parse(raw); for (var j in p) s[j] = p[j]; }
     } catch (e) { /* ignore corrupt/blocked storage */ }
+    // Retired themes (the old compact/CRT set) fall back to Auto for anyone who
+    // had one saved before they were removed.
+    if (!THEMES[s.theme]) s.theme = DEFAULTS.theme;
     return s;
   }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }

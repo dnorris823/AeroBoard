@@ -19,12 +19,10 @@
    sky outside. If sun times are unavailable (polar day/night) it falls back to fixed clock
    hours. A window.AeroBoardSunTest = { min, sunrise, sunset } override forces a time (dev).
 
-   Two scene modes:
-   - band  (t1 themes): a 40px living-airport strip along the bottom.
-   - full  (t2 themes): a dense, full-bleed airport landscape covering the whole screen,
-     with the UI floating on translucent "smoked-glass" panels. These render at a higher
-     internal resolution (512x288) for finer pixels; the UI is drawn in the original
-     384x216 logical space and scaled up, so its chrome stays chunky over a detailed world. */
+   Scene: a dense, full-bleed airport landscape covering the whole screen, with the UI
+   floating on translucent "smoked-glass" panels. This renders at a higher internal
+   resolution (512x288) for finer pixels; the UI is drawn in the original 384x216 logical
+   space and scaled up, so its chrome stays chunky over a detailed world. */
 (function () {
   // ---- offline sample (verbatim from the repo, +1 GA for a fuller board) ----
   const SAMPLE = {
@@ -153,41 +151,6 @@
 
   // ============================ THEMES ============================
   const THEMES = {
-    // ---- t1: band scene, opaque panels, 384x216 ----
-    night: {
-      id: 'night', font: "'Space Mono', monospace", fontSize: 0,
-      scene: 'night', flap: 'subtle', crt: false, grain: true,
-      C: {
-        bg: '#070b16', panel: '#0d1526', panelHi: '#152238', line: '#243b5c',
-        inner: '#0a0e16', ring: '#173327',
-        ink: '#f3ead6', dim: '#8aa0c4', faint: '#4a5c80',
-        amber: '#ffb454', green: '#5fe3a1', blue: '#6db4ff', red: '#ff6b6b',
-        glow: '#ffcf87', sky: ['#0a1730', '#122a4d', '#26507f'],
-      },
-    },
-    poster: {
-      id: 'poster', font: "'Space Mono', monospace", fontSize: 0,
-      scene: 'sunset', flap: 'full', crt: false, grain: true,
-      C: {
-        bg: '#f2e6cf', panel: '#1d3a4a', panelHi: '#264d61', line: '#0e2530',
-        inner: '#0c2430', ring: '#2a4c3e',
-        ink: '#f7efe0', dim: '#c9b48c', faint: '#8a9aa0',
-        amber: '#e8a13c', green: '#3fae82', blue: '#2f7f9e', red: '#d1573e',
-        glow: '#f2c14e', sky: ['#f4b45f', '#e88a4d', '#c85d4e'],
-      },
-    },
-    crt: {
-      id: 'crt', font: "'VT323', monospace", fontSize: 2,
-      scene: 'none', flap: 'none', crt: true, grain: false,
-      C: {
-        bg: '#020604', panel: '#04120b', panelHi: '#07200f', line: '#0d3a1f',
-        inner: '#04120b', ring: '#0d3a1f',
-        ink: '#7dffb0', dim: '#3fae74', faint: '#1f6b45',
-        amber: '#ffcf5c', green: '#7dffb0', blue: '#5fd0ff', red: '#ff7a5c',
-        glow: '#7dffb0', sky: ['#03140c', '#062012', '#0a3019'],
-      },
-    },
-
     // ---- t2: full-bleed dense landscape, glass panels, 512x288 ----
     night2: {
       id: 'night2', font: "'Space Mono', monospace", fontSize: 0,
@@ -380,8 +343,8 @@
     let MIX = null;   // { a, b, f } phase blend consumed by P(); null => static theme
 
     let autoMode = (themeId === 'auto');
-    let curId = autoMode ? 'auto' : (THEMES[themeId] ? themeId : 'night');
-    let theme = autoMode ? AUTO : (THEMES[curId] || THEMES.night);
+    let curId = autoMode ? 'auto' : (THEMES[themeId] ? themeId : 'night3');
+    let theme = autoMode ? AUTO : (THEMES[curId] || THEMES.night3);
     let C = theme.C;
     let TAG = TAGMAP(C);
     let FS = theme.fontSize || 0;
@@ -629,52 +592,6 @@
         if (big) addHit(px - 6, py - 6, 12, 12, () => { selectedHex = ac.hex; view = 'detail'; });
       }
       rect(cx - 1, cy - 1, 2, 2, C.amber);
-    }
-
-    // ======================================================================
-    //  BAND SCENE (t1) — 40px living-airport strip
-    // ======================================================================
-    function drawScene(x, y, w, h) {
-      if (theme.scene === 'none') return;
-      const sky = C.sky;
-      const g = ctx.createLinearGradient(0, y, 0, y + h);
-      g.addColorStop(0, sky[0]); g.addColorStop(.55, sky[1]); g.addColorStop(1, sky[2]);
-      rect(x, y, w, h, '#000'); ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
-      if (theme.scene === 'night') {
-        ctx.fillStyle = 'rgba(255,255,255,.55)';
-        for (let i = 0; i < 26; i++) {
-          const sx = x + ((i * 71) % w), sy = y + ((i * 37) % Math.floor(h * .5));
-          ctx.globalAlpha = 0.4 + 0.6 * Math.abs(Math.sin(t * 1.5 + i)); ctx.fillRect(sx, sy, 1, 1);
-        }
-        ctx.globalAlpha = 1;
-      } else {
-        const sunX = x + w * 0.16, sunY = y + h * 0.42;
-        ctx.fillStyle = C.glow; ctx.beginPath(); ctx.arc(sunX, sunY, 9, 0, 7); ctx.fill();
-        ctx.fillStyle = hexA(C.glow, .18); ctx.beginPath(); ctx.arc(sunX, sunY, 15, 0, 7); ctx.fill();
-      }
-      const gy = y + h - 10;
-      rect(x, gy, w, h - (gy - y), theme.scene === 'night' ? '#06120c' : '#3a2a22');
-      for (let i = 0; i < 8; i++) { const lx = x + 40 + i * ((w - 70) / 8); rect(lx, gy - 1, 1, 2, i % 2 ? '#ff5b5b' : C.glow); }
-      rect(x + 10, gy - 9, 22, 9, theme.scene === 'night' ? '#0d1c2b' : '#5a4236');
-      ctx.fillStyle = theme.scene === 'night' ? '#14283c' : '#6e5040';
-      ctx.beginPath(); ctx.moveTo(x + 10, gy - 9); ctx.lineTo(x + 21, gy - 13); ctx.lineTo(x + 32, gy - 9); ctx.fill();
-      rect(x + 18, gy - 5, 6, 5, hexA(C.glow, .5));
-      const tx = x + w - 60;
-      rect(tx, gy - 26, 6, 26, theme.scene === 'night' ? '#122236' : '#6b5040');
-      rect(tx - 3, gy - 34, 12, 9, theme.scene === 'night' ? '#1b3350' : '#7d5f49');
-      ctx.globalAlpha = 0.6 + 0.4 * Math.sin(t * 2); rect(tx - 2, gy - 33, 10, 5, C.glow); ctx.globalAlpha = 1;
-      const on = Math.sin(beacon) > 0.4;
-      rect(tx + 3, gy - 37, 2, 2, on ? '#5fe3a1' : '#183a2a');
-      const wx = x + w - 20; rect(wx, gy - 12, 1, 12, '#7a8aa4');
-      ctx.fillStyle = C.amber; ctx.beginPath(); ctx.moveTo(wx + 1, gy - 12); ctx.lineTo(wx + 9, gy - 11); ctx.lineTo(wx + 9, gy - 8); ctx.lineTo(wx + 1, gy - 8); ctx.fill();
-      const pT = (t * 0.06) % 1, plx = x + w - pT * (w + 30) + 15, ply = y + 14 + Math.sin(t * 0.8) * 2;
-      smallPlane(plx, ply, theme.scene === 'night' ? '#cdd9ec' : '#f4ead6');
-    }
-    function smallPlane(px, py, col) {
-      rect(px, py, 12, 2, col); rect(px + 11, py - 1, 2, 1, col);
-      rect(px + 5, py - 3, 2, 3, col); rect(px + 5, py + 2, 2, 3, col);
-      rect(px, py - 2, 2, 2, col);
-      rect(px + 5, py - 4, 1, 1, '#ff5b5b'); rect(px + 5, py + 5, 1, 1, '#5fe3a1');
     }
 
     // ======================================================================
@@ -942,7 +859,6 @@
 
     // ============================ BOARD ============================
     function drawBoard(d) {
-      const hasBand = theme.scene !== 'none';
       rect(0, 0, W, 15, C.panel); rect(0, 15, W, 1, C.line);
       // Title comes from the configured location: first word is the big "code",
       // the remainder is the subtitle — so any place in the world reads sensibly.
@@ -950,7 +866,7 @@
       const sp = lbl.search(/[ ,·]/);
       const code = (sp < 0 ? lbl : lbl.slice(0, sp)).toUpperCase().slice(0, 12);
       const sub = (sp < 0 ? '' : lbl.slice(sp + 1).replace(/^[\s,·]+/, '')).toUpperCase();
-      text(code, 5, 3, C.amber, 12, { bold: true, glow: theme.crt ? true : ((theme.id === 'night' || theme.id === 'night2' || theme.id === 'night3') ? C.glow : false) });
+      text(code, 5, 3, C.amber, 12, { bold: true, glow: (theme.id === 'night2' || theme.id === 'night3') ? C.glow : false });
       if (sub) {
         ctx.font = `bold ${12 + FS}px ${theme.font}`;   // measure the code to place the subtitle
         const codeW = ctx.measureText(code).width;
@@ -964,15 +880,13 @@
       if (wxOn) drawWxRibbon(16);
       const hb = wxOn ? 29 : 16;
 
-      const sceneH = hasBand ? 40 : 0;
       const rowH = 25, listX = 3, listW = 248, tbH = 11;
       const top = hb + 2;
       const listTop = top + tbH;                        // rows begin below the toolbar
-      const listBottom = H - (hasBand ? sceneH + 2 : 14);
+      const listBottom = H - 14;
       const visibleH = listBottom - listTop;
       const maxRows = Math.max(1, Math.floor(visibleH / rowH));
-      if (theme.id === 'poster') rect(0, hb, 252, listBottom - hb, C.panel);
-      else if (theme.glass) rect(0, hb, 253, listBottom - hb, C.glassList);
+      if (theme.glass) rect(0, hb, 253, listBottom - hb, C.glassList);
 
       // Filter + sort just the list (the radar/counts still reflect every flight).
       const viewFlights = applyView(d.flights);
@@ -1065,8 +979,7 @@
         cyy += 9;
       }
 
-      if (hasBand) drawScene(0, H - sceneH, W, sceneH);
-      else footer(d);
+      footer(d);
 
       if (filterOpen) drawFilterPanel();   // modal — drawn last, hits registered last
     }
@@ -1160,7 +1073,7 @@
       let labelX = 12;
       if (bkey) { accentBar(bkey); tailBadge(12, 22, ac, bkey); labelX = 38; }
       if (theme.flap === 'full' || theme.flap === 'subtle') flapRow(ac.label, labelX, 22, 13, 15, C.ink);
-      else text(ac.label, labelX, 22, C.ink, 22, { bold: true, glow: theme.crt });
+      else text(ac.label, labelX, 22, C.ink, 22, { bold: true });
       // airline name from adsbdb (shown for any known carrier; the brand chip
       // above only appears for carriers we have a color for). Country is the
       // ISO code, e.g. "US". Falls back to the route cities when unknown.
@@ -1217,7 +1130,7 @@
     function drawRadarView(d) {
       rect(0, 0, W, 16, C.panel); rect(0, 16, W, 1, C.line);
       backButton();
-      text('RADAR · ' + d.radius_nm + ' NM', W / 2, 4, C.green, 11, { bold: true, center: true, glow: theme.crt });
+      text('RADAR · ' + d.radius_nm + ' NM', W / 2, 4, C.green, 11, { bold: true, center: true });
       text('TRACKING ' + d.tracking, W - 4, 4, C.dim, 10, { right: true });
       if (theme.glass) { rect(6, 22, 250, H - 32, C.glassList); }
       if (d.location_label) text('◎ ' + d.location_label.slice(0, 22), 132, 19, C.dim, 8, { center: true });
@@ -1298,14 +1211,7 @@
 
     // ---- post fx (native res) ----
     function postFx() {
-      if (theme.crt) {
-        ctx.fillStyle = 'rgba(0,0,0,.22)';
-        for (let y = 0; y < CH; y += 2) ctx.fillRect(0, y, CW, 1);
-        const vg = ctx.createRadialGradient(CW / 2, CH / 2, 40, CW / 2, CH / 2, CW * 0.62);
-        vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)');
-        ctx.fillStyle = vg; ctx.fillRect(0, 0, CW, CH);
-        ctx.fillStyle = 'rgba(80,255,170,.03)'; ctx.fillRect(0, 0, CW, CH);
-      } else if (theme.grain) {
+      if (theme.grain) {
         const vg = ctx.createRadialGradient(CW / 2, CH / 2, CH * 0.28, CW / 2, CH / 2, CW * 0.7);
         vg.addColorStop(0, 'rgba(0,0,0,0)');
         vg.addColorStop(1, theme.scene2 === 'sunset' ? 'rgba(30,20,30,.35)' : 'rgba(0,0,0,.42)');
@@ -1392,17 +1298,16 @@
     }, { passive: false });
     canvas.__setView = (v) => { if (v === 'detail' && !selectedHex) selectedHex = data.flights[0].hex; view = v; };
 
-    // The whole board is laid out on a fixed grid tuned for the board fonts
-    // (Space Mono, and VT323 for the CRT theme). Those fonts are only ever
-    // painted on the canvas, never in the DOM — and WebKit (iPad Safari) won't
-    // download an @font-face that isn't matched to DOM text, so the canvas would
-    // fall back to a wide system monospace and every label would overflow its box.
-    // Ask the Font Loading API to fetch them explicitly (Safari honours this) and
-    // hold the first paint until they're ready, with a timeout so a slow/offline
-    // font load never leaves the screen blank.
+    // The whole board is laid out on a fixed grid tuned for Space Mono. The font
+    // is only ever painted on the canvas, never in the DOM — and WebKit (iPad
+    // Safari) won't download an @font-face that isn't matched to DOM text, so the
+    // canvas would fall back to a wide system monospace and every label would
+    // overflow its box. Ask the Font Loading API to fetch it explicitly (Safari
+    // honours this) and hold the first paint until it's ready, with a timeout so
+    // a slow/offline font load never leaves the screen blank.
     let raf = 0, destroyed = false;
     function begin() { if (!destroyed && !raf) raf = requestAnimationFrame(loop); }
-    const fontsToLoad = ["700 16px 'Space Mono'", "400 16px 'Space Mono'", "400 16px 'VT323'"];
+    const fontsToLoad = ["700 16px 'Space Mono'", "400 16px 'Space Mono'"];
     if (window.document && document.fonts && document.fonts.load) {
       Promise.race([
         Promise.all(fontsToLoad.map(f => document.fonts.load(f).catch(() => {}))),

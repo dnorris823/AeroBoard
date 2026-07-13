@@ -22,14 +22,12 @@
      <link> left the installed PWA on a wide system monospace and every label
      overflowed. Bundling them (and caching them in the service worker)
      guarantees the correct metrics on every device, online or offline.
-     Space Mono is the primary board face — its open W/4/8 read far better in
-     bold than the old Silkscreen pixel font. VT323 stays for the CRT theme. */
+     Space Mono is the board face — its open W/4/8 read far better in bold than
+     the old Silkscreen pixel font. */
   @font-face{font-family:'Space Mono';font-style:normal;font-weight:400;
     font-display:swap;src:url(fonts/spacemono-400.woff2) format('woff2');}
   @font-face{font-family:'Space Mono';font-style:normal;font-weight:700;
     font-display:swap;src:url(fonts/spacemono-700.woff2) format('woff2');}
-  @font-face{font-family:'VT323';font-style:normal;font-weight:400;
-    font-display:swap;src:url(fonts/vt323-400.woff2) format('woff2');}
   html,body{margin:0;height:100%;background:#000;overflow:hidden;}
   body{display:grid;place-items:center;}
   /* The engine sizes the canvas backing store (384×216 or 512×288); CSS just
